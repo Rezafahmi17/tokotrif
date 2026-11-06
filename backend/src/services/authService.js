@@ -13,7 +13,7 @@ export const loginSchema=z.object({email:z.string().email(),password:z.string().
 export const credentialsSchema=z.object({oldPassword:z.string().min(1),newPassword:z.string().min(8)});
 export const emailSchema=z.object({oldPassword:z.string().min(1),email:z.string().email()});
 export async function register(body,isStore=false){
- const email=body.email.toLowerCase();
+ const email=body.email.trim().toLowerCase();
  const existing=await one('SELECT id,role,password_hash FROM users WHERE email=?',[email]);
  if(existing){
   if(isStore&&existing.role==='customer'){
@@ -47,7 +47,7 @@ export async function openStore(userId,body){
  });
 }
 export async function login(body){
- const user=await one('SELECT * FROM users WHERE email=?',[body.email.toLowerCase()]);
+ const user=await one('SELECT * FROM users WHERE email=?',[body.email.trim().toLowerCase()]);
  if(!user||user.status!=='active'||!await bcrypt.compare(body.password,user.password_hash))fail(401,'Email atau sandi salah');
  await db.query('UPDATE users SET last_login_at=NOW() WHERE id=?',[user.id]);
  if(user.role==='admin_toko'){

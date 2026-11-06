@@ -21,9 +21,10 @@ export default function AuthPages({kind}){
 
  const submit=async e=>{
   e.preventDefault();setLoading(true);setError('');
+  const email=form.email.trim();
   try{
    if(kind==='login'){
-    await login(form.email,form.password);
+    await login(email,form.password);
     const me=await api('/auth/me');
     const next=new URLSearchParams(window.location.search).get('next');
     router.replace(next?.startsWith('/')?next:me.role==='super_admin'?'/super-admin':me.role==='admin_toko'?'/admin-toko':'/');
