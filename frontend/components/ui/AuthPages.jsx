@@ -24,10 +24,10 @@ export default function AuthPages({kind}){
   const email=form.email.trim();
   try{
    if(kind==='login'){
-    await login(email,form.password);
-    const me=await api('/auth/me');
+    const loggedUser=await login(email,form.password);
+    const me=loggedUser||(await api('/auth/me'));
     const next=new URLSearchParams(window.location.search).get('next');
-    router.replace(next?.startsWith('/')?next:me.role==='super_admin'?'/super-admin':me.role==='admin_toko'?'/admin-toko':'/');
+    router.replace(next?.startsWith('/')?next:me?.role==='super_admin'?'/super-admin':me?.role==='admin_toko'?'/admin-toko':'/');
     return;
    }
    if(isExistingCustomerOpeningStore){

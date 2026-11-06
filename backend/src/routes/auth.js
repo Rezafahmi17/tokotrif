@@ -13,9 +13,15 @@ r.post('/open-store',authenticate,validate(service.openStoreSchema),wrap(async(r
  const result=await service.openStore(req.user.id,req.body);
  const token=jwt.sign({sub:req.user.id,role:'admin_toko'},env.JWT_SECRET,{expiresIn:'7d'});
  res.cookie(cookieName,token,cookieOpts);
- ok(res,result,'Pendaftaran toko berhasil dan sedang menunggu verifikasi super admin',201);
+ ok(res,{...result,token},'Pendaftaran toko berhasil dan sedang menunggu verifikasi super admin',201);
 }));
-r.post('/login',validate(service.loginSchema),wrap(async(req,res)=>{const token=await service.login(req.body);res.cookie(cookieName,token,cookieOpts);ok(res,null,'Berhasil masuk');}));
+r.post('/login',validate(service.loginSchema),wrap(async(req,res)=>{
+ const token=await service.login(req.body);
+ const payload=jwt.verify(token,env.JWT_SECRET);
+ const user=await service.profile(payload.sub);
+ res.cookie(cookieName,token,cookieOpts);
+ ok(res,{token,user},'Berhasil masuk');
+}));
 r.post('/logout',(req,res)=>{res.clearCookie(cookieName,{...cookieOpts,maxAge:undefined});ok(res,null,'Berhasil keluar');});
 r.get('/me',authenticate,wrap(async(req,res)=>ok(res,await service.profile(req.user.id))));
 r.patch('/password',authenticate,validate(service.credentialsSchema),wrap(async(req,res)=>{await service.updatePassword(req.user.id,req.body);ok(res,null,'Sandi berhasil diubah');}));

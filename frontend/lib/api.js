@@ -5,8 +5,23 @@ export const SERVER=API.replace(/\/api\/?$/,'');
 export function imageSrc(path){if(!path)return null;if(/^https?:\/\//.test(path))return path;if(path.startsWith('/uploads/'))return SERVER+path;return path;}
 export async function api(path,{method='GET',body,headers={},...opts}={}){
  const isForm=typeof FormData!=='undefined'&&body instanceof FormData;
+ const token=typeof window!=='undefined'?localStorage.getItem('kb_token'):null;
+ const authHeaders=token?{Authorization:`Bearer ${token}`}:{};
  let response;
- try{response=await fetch(`${API}${path}`,{method,credentials:'include',headers:{...(!isForm&&body!==undefined?{'Content-Type':'application/json'}:{}),...headers},...(body!==undefined?{body:isForm?body:JSON.stringify(body)}:{}),cache:'no-store',...opts});}
+ try{
+  response=await fetch(`${API}${path}`,{
+   method,
+   credentials:'include',
+   headers:{
+    ...authHeaders,
+    ...(!isForm&&body!==undefined?{'Content-Type':'application/json'}:{}),
+    ...headers
+   },
+   ...(body!==undefined?{body:isForm?body:JSON.stringify(body)}:{}),
+   cache:'no-store',
+   ...opts
+  });
+ }
  catch{throw new Error('Tidak dapat terhubung ke backend. Pastikan server Express berjalan di port 5000.');}
  const text=await response.text();let result;
  try{result=text?JSON.parse(text):{};}catch{throw new Error('Respons server tidak sesuai format JSON');}
