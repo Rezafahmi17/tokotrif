@@ -26,12 +26,11 @@ export const authorize=(...roles)=>(req,res,next)=>{
 };
 class ErrorWithStatus extends Error{constructor(status,message){super(message);this.status=status;}}
 export const storeScope=wrap(async(req,res,next)=>{
- let store=await one('SELECT * FROM stores WHERE owner_user_id=? AND deleted_at IS NULL',[req.user.id]);
+ const store=await one('SELECT * FROM stores WHERE owner_user_id=? AND deleted_at IS NULL',[req.user.id]);
  if(!store)fail(403,'Akun tidak memiliki toko. Silakan buat toko terlebih dahulu.');
- if(store.status==='pending'){
-  await db.query("UPDATE stores SET status='approved', verified_at=NOW() WHERE id=?",[store.id]);
-  store.status='approved';
- }
+ if(store.status==='pending')fail(403,'Toko Anda sedang menunggu verifikasi oleh Super Admin. Anda dapat mulai mengelola produk setelah toko disetujui.');
+ if(store.status==='rejected')fail(403,`Pendaftaran toko ditolak: ${store.rejection_reason||'Tidak memenuhi kriteria'}`);
+ if(store.status==='suspended')fail(403,`Toko sedang ditangguhkan: ${store.rejection_reason||'Silakan hubungi admin'}`);
  if(store.status!=='approved')fail(403,`Toko belum dapat digunakan (status: ${store.status})`);
  req.store=store;next();
 });

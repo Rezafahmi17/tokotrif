@@ -32,14 +32,14 @@ export default function AuthPages({kind}){
    if(isExistingCustomerOpeningStore){
     await api('/auth/open-store',{method:'POST',body:{storeName:form.storeName,city:form.city,address:form.address,storePhone:form.storePhone||user.phone,description:form.description||''}});
     await refresh();
-    show('Toko berhasil dibuka dan langsung aktif! Mengalihkan ke Pusat Penjual...');
+    show('Pendaftaran toko berhasil! Menunggu verifikasi dari Super Admin.');
     router.replace('/admin-toko');
     return;
    }
    if(isRegister){
     if(isStoreForm){
      await api('/auth/register-store',{method:'POST',body:form});
-     show('Akun toko berhasil dibuat dan langsung aktif! Silakan masuk.');
+     show('Pendaftaran toko berhasil! Akun Anda sedang menunggu verifikasi dari Super Admin.');
     }else{
      await api('/auth/register',{method:'POST',body:form});
      show('Akun berhasil didaftarkan. Silakan masuk.');

@@ -22,18 +22,18 @@ export async function register(body,isStore=false){
    if(existingStore)fail(409,'Akun ini sudah memiliki toko');
    await tx(async c=>{
     await c.query("UPDATE users SET role='admin_toko' WHERE id=?",[existing.id]);
-    await c.query('INSERT INTO stores(owner_user_id,name,slug,city,address,phone,description,status,verified_at,last_active_at) VALUES(?,?,?,?,?,?,?,?,NOW(),NOW())',[existing.id,body.storeName,uniqSlug(body.storeName),body.city,body.address,body.storePhone,body.description||null,'approved']);
+    await c.query('INSERT INTO stores(owner_user_id,name,slug,city,address,phone,description,status,verified_at,last_active_at) VALUES(?,?,?,?,?,?,?,?,NULL,NOW())',[existing.id,body.storeName,uniqSlug(body.storeName),body.city,body.address,body.storePhone,body.description||null,'pending']);
    });
-   return {id:existing.id,role:'admin_toko',storeStatus:'approved'};
+   return {id:existing.id,role:'admin_toko',storeStatus:'pending'};
   }
   fail(409,existing.role==='admin_toko'?'Email sudah terdaftar sebagai penjual. Silakan langsung masuk.':'Email sudah terdaftar. Silakan gunakan email lain atau masuk ke akun Anda.');
  }
  const hash=await bcrypt.hash(body.password,12);
  const id=await tx(async c=>{
   const [r]=await c.query('INSERT INTO users (role,name,email,password_hash,phone) VALUES (?,?,?,?,?)',[isStore?'admin_toko':'customer',body.name,email,hash,body.phone]);
-  if(isStore)await c.query('INSERT INTO stores(owner_user_id,name,slug,city,address,phone,description,status,verified_at,last_active_at) VALUES(?,?,?,?,?,?,?,?,NOW(),NOW())',[r.insertId,body.storeName,uniqSlug(body.storeName),body.city,body.address,body.storePhone,body.description||null,'approved']);
+  if(isStore)await c.query('INSERT INTO stores(owner_user_id,name,slug,city,address,phone,description,status,verified_at,last_active_at) VALUES(?,?,?,?,?,?,?,?,NULL,NOW())',[r.insertId,body.storeName,uniqSlug(body.storeName),body.city,body.address,body.storePhone,body.description||null,'pending']);
   return r.insertId;
- });return {id,role:isStore?'admin_toko':'customer',storeStatus:isStore?'approved':undefined};
+ });return {id,role:isStore?'admin_toko':'customer',storeStatus:isStore?'pending':undefined};
 }
 export async function openStore(userId,body){
  return await tx(async c=>{
@@ -42,8 +42,8 @@ export async function openStore(userId,body){
   const existingStore=await one('SELECT id FROM stores WHERE owner_user_id=? AND deleted_at IS NULL',[userId],c);
   if(existingStore)fail(409,'Akun ini sudah memiliki toko');
   await c.query("UPDATE users SET role='admin_toko' WHERE id=?",[userId]);
-  const [r]=await c.query('INSERT INTO stores(owner_user_id,name,slug,city,address,phone,description,status,verified_at,last_active_at) VALUES(?,?,?,?,?,?,?,?,NOW(),NOW())',[userId,body.storeName,uniqSlug(body.storeName),body.city,body.address,body.storePhone||user.phone,body.description||null,'approved']);
-  return {storeId:r.insertId,status:'approved'};
+  const [r]=await c.query('INSERT INTO stores(owner_user_id,name,slug,city,address,phone,description,status,verified_at,last_active_at) VALUES(?,?,?,?,?,?,?,?,NULL,NOW())',[userId,body.storeName,uniqSlug(body.storeName),body.city,body.address,body.storePhone||user.phone,body.description||null,'pending']);
+  return {storeId:r.insertId,status:'pending'};
  });
 }
 export async function login(body){
@@ -51,7 +51,6 @@ export async function login(body){
  if(!user||user.status!=='active'||!await bcrypt.compare(body.password,user.password_hash))fail(401,'Email atau sandi salah');
  await db.query('UPDATE users SET last_login_at=NOW() WHERE id=?',[user.id]);
  if(user.role==='admin_toko'){
-  await db.query("UPDATE stores SET status='approved', verified_at=COALESCE(verified_at, NOW()), last_active_at=NOW() WHERE owner_user_id=? AND status='pending'",[user.id]);
   await db.query('UPDATE stores SET last_active_at=NOW() WHERE owner_user_id=? AND deleted_at IS NULL',[user.id]);
  }
  return jwt.sign({sub:user.id,role:user.role},env.JWT_SECRET,{expiresIn:'7d'});
@@ -59,7 +58,6 @@ export async function login(body){
 export async function profile(id){
  const user=await one('SELECT id,role,name,email,phone,status,created_at FROM users WHERE id=?',[id]);
  if(user?.role==='admin_toko'){
-  await db.query("UPDATE stores SET status='approved', verified_at=COALESCE(verified_at, NOW()) WHERE owner_user_id=? AND status='pending'",[id]);
   user.store=await one('SELECT id,name,slug,status,rejection_reason,city FROM stores WHERE owner_user_id=? AND deleted_at IS NULL',[id]);
  }
  return user;

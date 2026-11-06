@@ -8,12 +8,12 @@ import {authenticate,cookieName,cookieOpts} from '../middlewares/auth.js';
 import * as service from '../services/authService.js';
 const r=Router();
 r.post('/register',validate(service.regSchema),wrap(async(req,res)=>ok(res,await service.register(req.body),'Akun berhasil dibuat',201)));
-r.post('/register-store',validate(service.regStoreSchema),wrap(async(req,res)=>ok(res,await service.register(req.body,true),'Pendaftaran toko berhasil dan langsung aktif',201)));
+r.post('/register-store',validate(service.regStoreSchema),wrap(async(req,res)=>ok(res,await service.register(req.body,true),'Pendaftaran toko berhasil dan sedang menunggu verifikasi super admin',201)));
 r.post('/open-store',authenticate,validate(service.openStoreSchema),wrap(async(req,res)=>{
  const result=await service.openStore(req.user.id,req.body);
  const token=jwt.sign({sub:req.user.id,role:'admin_toko'},env.JWT_SECRET,{expiresIn:'7d'});
  res.cookie(cookieName,token,cookieOpts);
- ok(res,result,'Toko berhasil dibuka dan langsung aktif!',201);
+ ok(res,result,'Pendaftaran toko berhasil dan sedang menunggu verifikasi super admin',201);
 }));
 r.post('/login',validate(service.loginSchema),wrap(async(req,res)=>{const token=await service.login(req.body);res.cookie(cookieName,token,cookieOpts);ok(res,null,'Berhasil masuk');}));
 r.post('/logout',(req,res)=>{res.clearCookie(cookieName,{...cookieOpts,maxAge:undefined});ok(res,null,'Berhasil keluar');});
