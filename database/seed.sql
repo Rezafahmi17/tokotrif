@@ -1,6 +1,6 @@
 USE marketplace_cod;
 -- AKUN DEVELOPMENT ONLY. Email: admin@marketplace.local | Sandi awal: AdminCOD123!
-INSERT INTO users(role,name,email,password_hash) VALUES ('super_admin','Super Admin','admin@marketplace.local','$2y$12$u1/S9MH.tqHQKSCtvrIabOLLd/ckdS18GXes4iNT7YsUtOoMihO0i')
+INSERT INTO users(role,name,email,password_hash) VALUES ('super_admin','Super Admin','admin@marketplace.local','$2a$12$JO5XKyavMESUxecnlOjL6uXUO9oC3S9zRdiQz.sLXWkKx85/I5KIe')
 ON DUPLICATE KEY UPDATE name=VALUES(name);
 INSERT INTO categories(name,slug,icon,sort_order) VALUES
 ('Elektronik','elektronik','Laptop',1),
