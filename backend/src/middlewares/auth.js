@@ -3,9 +3,16 @@ import {env} from '../config/env.js';
 import {db,one} from '../config/db.js';
 import {fail,wrap} from '../utils/common.js';
 export const cookieName='marketplace_session';
-export const cookieOpts={httpOnly:true,sameSite:'lax',secure:env.NODE_ENV==='production',maxAge:7*24*60*60*1000,path:'/'};
+export const cookieOpts={
+ httpOnly:true,
+ sameSite:env.NODE_ENV==='production'?'none':'lax',
+ secure:env.NODE_ENV==='production',
+ maxAge:7*24*60*60*1000,
+ path:'/'
+};
 export const authenticate=wrap(async(req,res,next)=>{
- const token=req.cookies?.[cookieName];if(!token)fail(401,'Silakan masuk terlebih dahulu');
+ const token=req.cookies?.[cookieName]||req.headers.authorization?.replace(/^Bearer\s+/i,'');
+ if(!token)fail(401,'Silakan masuk terlebih dahulu');
  let payload;try{payload=jwt.verify(token,env.JWT_SECRET);}catch{fail(401,'Sesi kedaluwarsa, silakan masuk kembali');}
  const user=await one('SELECT id,role,name,email,phone,status FROM users WHERE id=?',[payload.sub]);
  if(!user||user.status!=='active')fail(401,'Akun tidak aktif');req.user=user;next();

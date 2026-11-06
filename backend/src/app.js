@@ -4,7 +4,7 @@ import authRoutes from './routes/auth.js';import adminRoutes from './routes/admi
 const app=express();app.disable('x-powered-by');app.use(helmet({crossOriginResourcePolicy:{policy:'cross-origin'}}));app.use(cors({origin:env.CLIENT_ORIGIN,credentials:true}));app.use(express.json({limit:'1mb'}));app.use(cookieParser());
 const general=rateLimit({windowMs:15*60*1000,limit:350,standardHeaders:'draft-7',legacyHeaders:false});
 const strict=rateLimit({windowMs:15*60*1000,limit:env.NODE_ENV==='production'?15:150,standardHeaders:'draft-7',legacyHeaders:false,message:{success:false,message:'Terlalu banyak percobaan, coba lagi dalam 15 menit'}});
-app.use('/api',general);app.use('/uploads',express.static(path.resolve(process.cwd(),env.UPLOAD_DIR),{maxAge:'7d'}));
+app.use('/api',general);app.use('/uploads',express.static(path.resolve(process.env.VERCEL?'/tmp':process.cwd(),env.UPLOAD_DIR),{maxAge:'7d'}));
 app.get('/api/health',wrap(async(req,res)=>{await db.query('SELECT 1');ok(res,{database:'connected',service:'marketplace-cod'},'API dan database aktif');}));
 app.use(['/api/auth/login','/api/auth/register','/api/auth/register-store','/api/auth/forgot-password'],strict);
 app.use('/api/auth',authRoutes);

@@ -12,7 +12,7 @@ export async function saveImage(file){
  const actual=await fileTypeFromBuffer(file.buffer);
  if(!['image/png','image/jpeg','image/webp'].includes(actual?.mime))fail(422,'Hanya gambar JPG, PNG, atau WebP yang didukung');
  const name=crypto.randomUUID()+'.webp';
- const directory=path.resolve(process.cwd(),env.UPLOAD_DIR);await fs.mkdir(directory,{recursive:true});
+ const directory=path.resolve(process.env.VERCEL?'/tmp':process.cwd(),env.UPLOAD_DIR);await fs.mkdir(directory,{recursive:true});
  await sharp(file.buffer).rotate().resize({width:1400,height:1400,fit:'inside',withoutEnlargement:true}).webp({quality:82}).toFile(path.join(directory,name));
  return '/uploads/'+name;
 }
