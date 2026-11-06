@@ -1,4 +1,5 @@
-export const API=process.env.NEXT_PUBLIC_API_URL||'http://localhost:5000/api';
+const rawUrl=(process.env.NEXT_PUBLIC_API_URL||'http://localhost:5000/api').trim().replace(/\/health\/?$/i,'').replace(/\/+$/,'');
+export const API=rawUrl.endsWith('/api')?rawUrl:`${rawUrl}/api`;
 export const SERVER=API.replace(/\/api\/?$/,'');
 export function imageSrc(path){if(!path)return null;if(/^https?:\/\//.test(path))return path;if(path.startsWith('/uploads/'))return SERVER+path;return path;}
 export async function api(path,{method='GET',body,headers={},...opts}={}){
