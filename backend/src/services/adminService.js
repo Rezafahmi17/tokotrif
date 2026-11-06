@@ -44,16 +44,11 @@ export async function deleteStore(id,actor,reason,confirm,ip){
  await tx(async c=>{
   const s=await one('SELECT * FROM stores WHERE id=? AND deleted_at IS NULL FOR UPDATE',[id],c);
   if(!s)fail(404,'Toko tidak ditemukan');
-  const days=Number((await one('SELECT `value` FROM settings WHERE `key`=?',['inactive_days'],c))?.value||30);
   const active=await one('SELECT COUNT(*) count FROM orders WHERE store_id=? AND status IN (?,?,?)',[id,'pending','confirmed','paid'],c);
-  const latest=await one('SELECT MAX(created_at) last_order FROM orders WHERE store_id=?',[id],c);
-  const edge=Date.now()-days*86400000;
-  const last=new Date(String(s.last_active_at||s.created_at).replace(' ','T')+'+07:00').getTime();
-  const orderTime=latest.last_order?new Date(String(latest.last_order).replace(' ','T')+'+07:00').getTime():0;
-  if(s.status!=='rejected'&&!(last<edge&&orderTime<edge))fail(409,'Hanya toko ditolak atau tidak aktif yang boleh dihapus');
-  if(active.count)fail(409,'Masih ada pesanan yang belum selesai');
+  if(active.count)fail(409,'Tidak dapat menghapus toko karena masih ada pesanan aktif yang belum selesai');
+  await c.query("UPDATE products SET deleted_at=NOW(),status='archived' WHERE store_id=? AND deleted_at IS NULL",[id]);
   await c.query('UPDATE stores SET deleted_at=NOW(),status=? WHERE id=?',['suspended',id]);
-  await c.query('UPDATE users SET status=?,deleted_at=NOW() WHERE id=?',['deleted',s.owner_user_id]);
+  await c.query("UPDATE users SET role='customer' WHERE id=?",[s.owner_user_id]);
   await writeAudit(actor,'store.delete','store',id,{reason},ip,c);
  });
 }
