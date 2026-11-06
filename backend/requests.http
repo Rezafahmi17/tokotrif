@@ -1,0 +1,64 @@
+@api = http://localhost:5000/api
+
+### Health check
+GET {{api}}/health
+
+### Login Super Admin (REST Client menyimpan cookie pada sebagian konfigurasi)
+POST {{api}}/auth/login
+Content-Type: application/json
+
+{"email":"admin@marketplace.local","password":"AdminCOD123!"}
+
+### Profil pengguna
+GET {{api}}/auth/me
+
+### Daftar pembeli
+POST {{api}}/auth/register
+Content-Type: application/json
+
+{"name":"Pembeli Baru","email":"pembeli.baru@example.local","password":"SandiPembeli123!","phone":"081234567890"}
+
+### Daftar penjual
+POST {{api}}/auth/register-store
+Content-Type: application/json
+
+{"name":"Penjual Baru","email":"penjual.baru@example.local","password":"SandiPenjual123!","phone":"081234567888","storeName":"Toko Contoh Baru","city":"Bandar Lampung","address":"Jalan Contoh Nomor 1","storePhone":"081234567888"}
+
+### Beranda katalog
+GET {{api}}/catalog/home
+
+### Cari produk
+GET {{api}}/catalog/products?q=&sort=bestseller&page=1&limit=12
+
+### Toko menunggu verifikasi (harus login Super Admin)
+GET {{api}}/admin/stores?status=pending
+
+### Persetujuan toko (sesuaikan ID)
+PATCH {{api}}/admin/stores/1/approve
+
+### Tambah keranjang (harus login customer)
+POST {{api}}/cart
+Content-Type: application/json
+
+{"product_id":1,"qty":1}
+
+### Checkout
+POST {{api}}/orders/checkout
+Content-Type: application/json
+
+{"note":"Bisa COD sekitar kampus"}
+
+### List pesanan penjual
+GET {{api}}/store/orders
+
+### Konfirmasi jadwal COD (admin toko)
+PATCH {{api}}/store/orders/1/confirm
+Content-Type: application/json
+
+{"meeting_location":"Depan kampus","meeting_at":"2026-11-07 13:00:00"}
+
+### Konfirmasi lunas (admin toko)
+PATCH {{api}}/store/orders/1/paid
+
+### Ringkasan keuangan
+GET {{api}}/store/finance/summary?from=2026-11-01&to=2026-11-30

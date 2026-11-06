@@ -1,0 +1,6 @@
+import {Router} from 'express';import {z} from 'zod';import {validate} from '../middlewares/validate.js';import {wrap,ok} from '../utils/common.js';import * as s from '../services/orderService.js';
+const r=Router();r.get('/',wrap(async(req,res)=>ok(res,await s.listOrders(req.user.id,req.query))));r.get('/:code',wrap(async(req,res)=>ok(res,await s.customerOrder(req.user.id,req.params.code))));r.post('/checkout',validate(z.object({note:z.string().max(1000).optional()})),wrap(async(req,res)=>ok(res,await s.checkout(req.user.id,req.body.note),'Pesanan COD berhasil dibuat',201)));
+r.patch('/:code/cancel',validate(z.object({reason:z.string().min(3)})),wrap(async(req,res)=>ok(res,await s.customerCancel(req.user.id,req.params.code,req.body.reason))));
+r.patch('/:code/received',wrap(async(req,res)=>ok(res,await s.received(req.user.id,req.params.code))));
+r.post('/:code/reviews',validate(z.object({product_id:z.coerce.number().int().positive(),rating:z.coerce.number().int().min(1).max(5),comment:z.string().max(2000).optional()})),wrap(async(req,res)=>ok(res,await s.addReview(req.user.id,req.params.code,req.body.product_id,req.body.rating,req.body.comment),'Ulasan tersimpan',201)));
+export default r;

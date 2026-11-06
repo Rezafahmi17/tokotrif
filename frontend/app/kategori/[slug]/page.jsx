@@ -1,0 +1,1 @@
+'use client';import {useParams} from 'next/navigation';import Listing from '@/components/product/Listing';export default function Page(){const {slug}=useParams();return <Listing initialCategory={slug}/>;}

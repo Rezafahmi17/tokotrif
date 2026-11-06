@@ -1,0 +1,14 @@
+import {Router} from 'express';import {z} from 'zod';import {validate} from '../middlewares/validate.js';import {wrap,ok} from '../utils/common.js';import * as s from '../services/productService.js';import {upload} from '../utils/upload.js';
+const r=Router();
+const product=z.object({name:z.string().min(3).max(200),category_id:z.coerce.number().int().positive(),description:z.string().max(5000).optional(),price:z.coerce.number().min(0),compare_price:z.coerce.number().min(0).nullable().optional(),sku:z.string().max(100).optional(),stock:z.coerce.number().int().nonnegative().default(0),low_stock_threshold:z.coerce.number().int().nonnegative().optional(),status:z.enum(['active','draft']).optional()});
+r.get('/',wrap(async(req,res)=>ok(res,await s.storeProducts(req.store.id,req.query))));
+r.get('/:id',wrap(async(req,res)=>ok(res,await s.storeProduct(req.store.id,req.params.id))));
+r.post('/',validate(product),wrap(async(req,res)=>ok(res,await s.createProduct(req.store.id,req.user.id,req.body),'Produk ditambahkan',201)));
+r.patch('/:id',validate(product.omit({stock:true}).partial().extend({status:z.enum(['active','draft','archived']).optional()})),wrap(async(req,res)=>ok(res,await s.updateProduct(req.store.id,req.params.id,req.body))));
+r.delete('/:id',wrap(async(req,res)=>{await s.archiveProduct(req.store.id,req.params.id);ok(res,null,'Produk diarsipkan');}));
+r.post('/:id/stock',validate(z.object({type:z.enum(['masuk','kurang','koreksi']),qty:z.coerce.number().int().nonnegative(),note:z.string().trim().min(3)})),wrap(async(req,res)=>{const b=req.body;ok(res,await s.adjustStock(req.store.id,req.user.id,req.params.id,b.type,b.qty,b.note));}));
+r.get('/:id/stock-history',wrap(async(req,res)=>ok(res,await s.stockHistory(req.store.id,req.params.id,req.query))));
+r.post('/:id/images',upload.array('images',5),wrap(async(req,res)=>ok(res,await s.addImages(req.store.id,req.params.id,req.files))));
+r.delete('/:id/images/:imageId',wrap(async(req,res)=>{await s.removeImage(req.store.id,req.params.id,req.params.imageId);ok(res);}));
+r.patch('/:id/images/:imageId/primary',wrap(async(req,res)=>{await s.setPrimary(req.store.id,req.params.id,req.params.imageId);ok(res);}));
+export default r;

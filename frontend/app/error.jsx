@@ -1,0 +1,1 @@
+'use client';export default function Error({error,reset}){return <div className="container page-space"><div className="error-panel"><h2>Terjadi kendala</h2><p>Halaman gagal dimuat. Silakan coba lagi.</p><button className="btn btn-primary" onClick={()=>reset()}>Coba lagi</button></div></div>;}

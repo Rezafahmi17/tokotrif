@@ -1,0 +1,2 @@
+import {Router} from 'express';import {wrap,ok} from '../utils/common.js';import * as s from '../services/catalogService.js';
+const r=Router();r.get('/home',wrap(async(req,res)=>ok(res,await s.home())));r.get('/products',wrap(async(req,res)=>ok(res,await s.listProducts(req.query))));r.get('/products/:slug',wrap(async(req,res)=>ok(res,await s.product(req.params.slug))));r.get('/stores/:slug',wrap(async(req,res)=>ok(res,await s.store(req.params.slug))));r.get('/categories',wrap(async(req,res)=>ok(res,await s.categories())));export default r;

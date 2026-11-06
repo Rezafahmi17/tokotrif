@@ -1,0 +1,1643 @@
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+  PRD dan Skema Prompt — Marketplace
+  Multi-Toko COD
+    Nov 6, 2026       ·   ​@Fahmi
+
+  Dokumen ini memuat PRD marketplace multi-toko dengan pembayaran tunai (COD) dan
+  13 prompt berurutan untuk membangunnya: frontend Next.js dan backend Express +
+  MySQL di folder terpisah.
+
+
+  Ringkasan
+  Produk ini adalah marketplace multi-toko: pemilik toko mendaftar, diverifikasi Super
+  Admin, lalu menjual barang yang dibayar tunai (COD) saat bertemu pembeli.
+
+         Pengguna: Super Admin (mengelola platform), Admin Toko (penjual sekaligus kasir),
+         Customer (pembeli).
+         Pembayaran: hanya tunai (COD). Pembeli dan penjual menyepakati lokasi dan waktu
+         lewat chat, lalu Admin Toko menekan "Konfirmasi lunas" setelah uang diterima. Tidak
+         ada ongkir atau kurir karena transaksinya bertemu langsung.
+         Tampilan: beranda mengikuti tata letak gambar referensi, diisi data nyata dari
+         database. Logo dan merek pada gambar referensi tidak dipakai; nama produk di
+         dokumen ini memakai placeholder NamaMarketplace .
+         Teknologi: JavaScript penuh. Frontend Next.js (App Router) dan Tailwind CSS;
+         backend Express dengan Socket.IO untuk chat; database MySQL yang bisa diimpor
+         lewat phpMyAdmin.
+         Struktur: tiga folder terpisah, frontend/ , backend/ , dan database/ .
+
+
+  Asumsi yang saya ambil
+         Stok berkurang saat Admin Toko menekan Konfirmasi lunas, sesuai catatan Anda.
+         Sejak checkout, jumlah itu ditahan sebagai stok dipesan supaya tidak terjual dua kali.
+         Satu pesanan hanya berisi barang dari satu toko. Keranjang berisi banyak toko
+         dipecah menjadi beberapa pesanan saat checkout.
+         Toko dianggap tidak aktif jika tidak ada login dan tidak ada pesanan selama 30 hari.
+         Super Admin bisa mengubah angka ini.
+         Hanya Rupiah, bahasa Indonesia, dan zona waktu WIB.
+
+
+
+
+                                                                                           Page 1 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+  Peran dan hak akses
+  Ada tiga peran, dan data setiap toko hanya bisa diakses oleh Admin Toko pemiliknya;
+  aturan ini ditegakkan di backend lewat store_id , bukan hanya disembunyikan di
+  tampilan.
+
+
+     Aksi                                           Super   Admin Toko                Customer
+                                                    Admin
+
+     Menelusuri produk dan toko                     ✓       ✓                         ✓
+     tanpa login
+
+     Daftar akun sendiri                            —       ✓ (menunggu verifikasi)   ✓
+
+     Login dan logout                               ✓       ✓ (dashboard terbuka      ✓
+                                                            setelah toko disetujui)
+
+     Ubah sandi dan email                           ✓       ✓                         ✓
+
+     Verifikasi toko baru (setujui atau             ✓       —                         —
+     tolak)
+
+     Memantau semua toko,                           ✓       —                         —
+     menonaktifkan atau menghapus
+     toko tidak aktif
+
+     Kelola kategori dan banner                     ✓       —                         —
+     beranda
+
+     Upload, ubah, hapus produk                     —       ✓ (toko sendiri)          —
+
+     Tambah, kurangi, hapus stok                    —       ✓ (toko sendiri)          —
+
+     Melihat pesanan dan Konfirmasi                 —       ✓ (toko sendiri)          —
+     lunas
+
+     Kelola pemasukan dan                           —       ✓ (toko sendiri)          —
+     pengeluaran, export Excel
+
+     Keranjang, checkout, batalkan                  —       —                         ✓
+     pesanan sebelum disepakati
+
+     Chat                                           —       ✓ (dengan customer toko   ✓ (dengan
+                                                            sendiri)                  toko)
+
+
+
+
+                                                                                             Page 2 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+     Aksi                                           Super   Admin Toko     Customer
+                                                    Admin
+
+     Konfirmasi barang diterima, beri               —       —              ✓
+     ulasan
+
+
+
+
+  Alur pengguna
+  Setiap pesanan berjalan melalui empat status, dan stok serta pemasukan toko baru
+  berubah saat Admin Toko menekan Konfirmasi lunas.
+
+
+
+
+  alur status pesanan COD · 4 status, 1 cabang batal
+
+  Sebelum bisa menjual, Admin Toko mendaftar lalu menunggu Super Admin menyetujui
+  tokonya (SA2). Pesanan hanya bisa dibatalkan sebelum lunas, dan stok yang ditahan
+  dikembalikan.
+
+
+
+
+                                                                                     Page 3 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+  Fitur dari catatan Anda
+  Semua 23 poin di catatan tulisan tangan dipetakan ke kode di bawah; kode yang sama
+  dipakai di prompt.
+
+
+     Kode         Catatan Anda                          Cara kerjanya di sistem
+
+     SA1          Super Admin: login                    Login email dan sandi. Akun Super Admin
+                                                        dibuat lewat seed, tidak ada tombol daftar
+                                                        untuk peran ini.
+
+     SA2          Verifikasi akun toko baru (bertanda   Toko yang mendaftar berstatus Menunggu.
+                  bintang)                              Super Admin melihat datanya lalu
+                                                        menyetujui atau menolak; penolakan wajib
+                                                        beralasan. Hasilnya muncul sebagai
+                                                        notifikasi.
+
+     SA3          Memantau toko; hapus akun toko        Daftar toko dengan status, aktivitas
+                  tidak aktif                           terakhir, jumlah produk dan pesanan. Toko
+                                                        tanpa aktivitas selama batas hari ditandai
+                                                        Tidak aktif. Hapus akun memakai
+                                                        konfirmasi dua langkah, bersifat soft
+                                                        delete, dan masuk audit log.
+
+     SA4          Ubah sandi dan email                  Halaman Pengaturan Akun; sandi lama
+                                                        wajib diisi, email baru dicek agar unik.
+
+     AT1          Admin Toko: daftar akun               Form berisi data pemilik dan toko (nama,
+                                                        kota, alamat, nomor HP). Status awal
+                                                        Menunggu.
+
+     AT2          Login                                 Sebelum disetujui, login hanya
+                                                        menampilkan halaman Menunggu
+                                                        verifikasi tanpa akses dashboard.
+
+     AT3.1        Upload barang yang dijual             Form produk: nama, kategori, deskripsi,
+                                                        harga, harga coret (opsional), stok awal,
+                                                        sampai 5 foto.
+
+     AT3.2        Tambah, kurangi, hapus stok           Penyesuaian stok dengan alasan dan
+                                                        riwayat pergerakan stok. Hapus produk
+                                                        berarti diarsipkan, supaya riwayat pesanan
+                                                        lama tetap utuh.
+
+
+
+
+                                                                                                   Page 4 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+     Kode         Catatan Anda                           Cara kerjanya di sistem
+
+     AT3.3        Verifikasi pembayaran lunas            Tombol Konfirmasi lunas pada detail
+                                                         pesanan. Ini ujung panah lengkung di
+                                                         catatan Anda: langkah Konfirmasi lunas
+                                                         pada alur COD (AT5.3) kembali ke sini.
+
+     AT3.4        Barang laku, stok otomatis berkurang   Saat Konfirmasi lunas, stok dan stok
+                                                         dipesan dikurangi, jumlah terjual naik, dan
+                                                         riwayat stok tercatat dalam satu transaksi
+                                                         database.
+
+     AT3.5        Kelola keuangan: pemasukan dan         Pemasukan tercatat otomatis dari pesanan
+                  pengeluaran                            lunas. Pengeluaran dicatat manual
+                                                         (kategori, tanggal, nominal, catatan).
+
+     AT3.6        Keuangan dapat dicetak ke Excel        Export .xlsx dengan filter rentang tanggal:
+                                                         ringkasan, rincian pemasukan, rincian
+                                                         pengeluaran.
+
+     AT4          Ganti sandi dan email toko             Pengaturan Akun, ditambah profil toko
+                                                         (nama, logo, alamat, area COD).
+
+     AT5.1        COD: ketemu dengan customer            Admin Toko mengisi lokasi dan jadwal
+                                                         bertemu yang disepakati lewat chat;
+                                                         status pesanan menjadi Disepakati.
+
+     AT5.2        COD: melakukan transaksi               Barang diserahkan dan uang tunai diterima
+                                                         langsung di luar sistem.
+
+     AT5.3        COD: konfirmasi lunas                  Admin Toko menekan Konfirmasi lunas,
+                                                         lanjut ke AT3.3 dan AT3.4.
+
+     CU1          Customer: daftar akun                  Form nama, email, sandi, nomor HP.
+
+     CU2          Login                                  Login email dan sandi.
+
+     CU3          Pilih barang dan masukkan keranjang    Keranjang tersimpan di database,
+                                                         dikelompokkan per toko, dan memeriksa
+                                                         stok.
+
+     CU4          Checkout atau pesan barang             Satu pesanan per toko. Status awal
+                                                         Menunggu konfirmasi toko.
+
+     CU5          Chat admin toko untuk COD dan          Chat real-time dengan toko, bisa dibuka
+                  transaksi                              dari detail pesanan.
+
+
+
+
+                                                                                                 Page 5 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+     Kode         Catatan Anda                           Cara kerjanya di sistem
+
+     CU6          Melakukan pembayaran tunai             Customer membayar tunai saat bertemu;
+                                                         layar pesanan menampilkan status sampai
+                                                         toko mengonfirmasi lunas.
+
+     CU7          Barang diterima                        Setelah lunas, customer menekan Barang
+                                                         diterima; pesanan selesai dan ulasan
+                                                         terbuka.
+
+
+
+
+  Fitur tambahan yang saya usulkan
+  Saya menambahkan 23 fitur di luar catatan Anda: 17 masuk MVP (dibangun di versi
+  pertama) dan 6 ditunda ke Tahap 2.
+
+
+     Kode        Fitur tambahan                        Manfaat                                Tahap
+
+     X1          Lupa sandi lewat email (token         Akun tidak terkunci permanen           MVP
+                 sekali pakai)
+
+     X2          Audit log aksi Super Admin            Jejak siapa menyetujui, menolak,       MVP
+                                                       atau menghapus toko
+
+     X3          Tolak atau tangguhkan toko dengan     Penjual tahu sebabnya; akun bisa       MVP
+                 alasan                                dipulihkan, tidak harus dihapus
+
+     X4          Pencarian, filter (kategori, harga,   Pembeli cepat menemukan barang         MVP
+                 kota, toko), urutan, paginasi
+
+     X5          Halaman toko publik                   Profil, produk, dan rating satu toko   MVP
+                                                       dalam satu halaman; membangun
+                                                       kepercayaan
+
+     X6          Banyak foto produk, harga coret,      Mengisi blok produk diskon seperti     MVP
+                 badge diskon                          pada referensi
+
+     X7          Peringatan stok menipis               Admin Toko tahu sebelum stok           MVP
+                                                       habis
+
+     X8          Ulasan dan rating setelah pesanan     Bintang pada kartu produk seperti      MVP
+                 selesai                               referensi; hanya pembeli
+                                                       sungguhan yang bisa menilai
+
+
+
+
+                                                                                                Page 6 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+     Kode        Fitur tambahan                       Manfaat                                Tahap
+
+     X9          Stok dipesan sejak checkout          Barang yang sama tidak terjual dua     MVP
+                                                      kali
+
+     X10         Pembatalan pesanan dengan alasan     Stok dipesan dikembalikan              MVP
+                                                      otomatis
+
+     X11         Linimasa status pesanan              Riwayat siapa mengubah status          MVP
+                                                      dan kapan
+
+     X12         Chat real-time dengan penanda        Kesepakatan COD berjalan tanpa         MVP
+                 belum dibaca                         pindah aplikasi
+
+     X13         Notifikasi dalam aplikasi (ikon      Pesanan baru, perubahan status,        MVP
+                 lonceng)                             hasil verifikasi toko
+
+     X14         Grafik keuangan dan laba bersih      Pemasukan, pengeluaran, dan laba       MVP
+                                                      per periode terlihat sekilas
+
+     X15         Dashboard Super Admin                Jumlah toko per status, pesanan,       MVP
+                                                      dan daftar toko tidak aktif
+
+     X16         Banner beranda dan statistik nyata   Banner dikelola Super Admin; angka     MVP
+                                                      bukti sosial dihitung dari database,
+                                                      bukan karangan
+
+     X17         Filter kota atau area COD            Pembeli memilih kota supaya            MVP
+                                                      bertemu penjual yang dekat
+
+     X18         Wishlist                             Simpan produk untuk nanti              Tahap
+                                                                                             2
+
+     X19         Kode serah-terima COD                Customer menyebut kode 6 digit         Tahap
+                                                      saat bertemu; mencegah salah           2
+                                                      konfirmasi lunas
+
+     X20         Nota pesanan yang bisa dicetak       Bukti transaksi untuk kedua pihak      Tahap
+                 atau disimpan PDF                                                           2
+
+     X21         Notifikasi email                     Kabar penting sampai walau             Tahap
+                                                      aplikasi tidak dibuka                  2
+
+     X22         Foto di chat dan lampiran bukti      Memudahkan menunjukkan barang          Tahap
+                 pengeluaran                          dan menyimpan nota                     2
+
+
+
+
+                                                                                               Page 7 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+     Kode        Fitur tambahan                                     Manfaat                                Tahap
+
+     X23         Pembatalan otomatis pesanan yang                   Stok dipesan tidak tertahan lama;      Tahap
+                 menggantung                                        batas waktu diatur Super Admin         2
+
+
+
+
+  Desain UI
+  Beranda mengikuti urutan blok pada gambar referensi, tetapi merek, Prime, dan unduhan
+  aplikasi diganti dengan hal yang relevan untuk marketplace COD. Semua isi blok berasal
+  dari database, bukan data karangan.
+
+
+     Blok pada referensi                            Adaptasi di marketplace Anda       Sumber data
+
+     Header: logo, pencarian                        Logo NamaMarketplace ,             categories, cart_items,
+     dengan dropdown kategori,                      pencarian dengan dropdown          notifications
+     Masuk, Pesanan, keranjang                      kategori, menu akun, Pesanan,
+     dengan badge                                   ikon lonceng notifikasi,
+                                                    keranjang dengan badge jumlah
+
+     Bar kedua: All Categories,                     Semua Kategori, Promo Hari Ini,    products, stores
+     Today's Deals, Best Sellers,                   Terlaris, Terbaru, Toko Pilihan,
+     New Releases, Prime,                           Bantuan, dan pemilih Area COD
+     Customer Service, Gift                         (kota). Prime dan Gift Cards
+     Cards, Deliver to                              dihapus
+
+     Menu Shop by Department                        Menu Belanja per Kategori          categories
+                                                    (mega menu dua level)
+
+     Banner hero berputar                           Banner berputar; tombol utama      banners (dikelola Super
+     dengan dua tombol                              ke daftar produk, tombol kedua     Admin)
+                                                    ke daftar toko
+
+     Strip lima keunggulan                          COD Bayar di Tempat, Toko          teks tetap
+     (ongkir, retur, pembayaran                     Terverifikasi, Chat Langsung
+     aman, bantuan, Prime)                          dengan Penjual, Stok Real-time,
+                                                    Transaksi Tercatat. Ongkir,
+                                                    retur, dan Prime dihapus karena
+                                                    tidak ada di sistem Anda
+
+     Shop by Category:                              Lingkaran kategori dengan ikon     categories
+     lingkaran ikon yang bisa                       atau foto
+     digeser
+
+
+
+                                                                                                                 Page 8 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+     Blok pada referensi                            Adaptasi di marketplace Anda      Sumber data
+
+     Today's Best Deals: kartu                      Produk Diskon: produk             products, reviews
+     dengan badge persen,                           berharga coret; badge persen
+     rating, harga, harga coret,                    dihitung otomatis; tombol +
+     tombol Add to Cart                             Keranjang
+
+     Baris empat banner promo,                      Tiga banner promo dan satu        banners
+     salah satunya Prime                            kartu ajakan Buka Toko Anda
+                                                    yang menuju halaman daftar
+                                                    toko
+
+     Strip lima jaminan kedua                       Strip Cara Belanja empat          teks tetap
+                                                    langkah: Pilih barang, Chat
+                                                    penjual, Bertemu dan bayar
+                                                    tunai, Barang diterima (sama
+                                                    dengan alur CU3 sampai CU7)
+
+     Best Sellers in Electronics:                   Terlaris dengan tab kategori,     products.sold_count
+     carousel                                       diurutkan jumlah terjual
+
+     Loved by Millions: rating,                     Dipercaya Pembeli: jumlah toko    stores, orders, reviews
+     avatar, unduh aplikasi dan                     terverifikasi, pesanan selesai,
+     QR                                             dan rata-rata rating, semuanya
+                                                    dihitung dari database; bagian
+                                                    unduh aplikasi dihapus
+
+     Footer: kolom tautan dan                       Kolom Tentang, Bantuan, Jual      teks tetap
+     ikon pembayaran                                (Daftar Toko, Masuk Admin
+                                                    Toko), Akun; ikon kartu diganti
+                                                    lencana Bayar Tunai (COD)
+
+
+
+  Halaman lain
+         Publik: hasil cari dan kategori (filter di kiri, grid di kanan), detail produk (galeri, harga,
+         stok, tombol Keranjang dan Chat Penjual, ulasan), halaman toko, keranjang yang
+         dikelompokkan per toko, masuk, daftar, daftar toko, lupa sandi.
+         Customer: checkout, daftar pesanan, detail pesanan (linimasa dan chat), chat, akun.
+         Admin Toko: tata letak sidebar berisi Dashboard, Produk, Stok, Pesanan, Keuangan,
+         Chat, Pengaturan.
+         Super Admin: sidebar berisi Dashboard, Verifikasi Toko, Semua Toko, Kategori, Banner,
+         Audit Log, Pengaturan.
+
+
+                                                                                                                Page 9 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+  Token desain
+
+     Token                                          Nilai
+
+     Warna utama (header, footer, sidebar)          Navy tua mengikuti referensi, #0F1F3D
+
+     Aksen dan tombol utama                         Amber #F59E0B , teks di atasnya navy tua
+
+     Latar dan kartu                                Latar #F5F6F8 , kartu putih; teks #111827 dan
+                                                    #6B7280
+
+     Status                                         Sukses #16A34A , peringatan #D97706 , bahaya
+                                                    #DC2626
+
+     Font                                           Plus Jakarta Sans lewat next/font
+
+     Bentuk                                         Kartu radius 12 px, tombol 8 px, bayangan tipis,
+                                                    kartu naik 2 px saat disorot
+
+     Gerak                                          Transisi 150 sampai 250 ms, skeleton saat memuat,
+                                                    hormati prefers-reduced-motion
+
+     Responsif                                      Mobile-first; grid produk 2 kolom di ponsel, 3 di
+                                                    tablet, 5 di desktop lebar
+
+     Pustaka                                        lucide-react (ikon), framer-motion (gerak halus),
+                                                    Recharts (grafik), react-hook-form dan zod (form)
+
+
+
+
+  Arsitektur dan struktur folder
+  Frontend dan backend adalah dua proyek terpisah yang hanya berbicara lewat REST API
+  dan Socket.IO; database punya foldernya sendiri supaya skema mudah diimpor lewat
+  phpMyAdmin.
+
+     marketplace/
+     ├── frontend/                                   # Next.js (App Router, JavaScript) +
+     Tailwind
+     │   ├── app/
+     │   │   ├── (public)/                           # beranda, cari, produk/[slug],
+     toko/[slug], keranjang
+     │   │   ├── (auth)/                             # masuk, daftar, daftar-toko, lupa-sandi,
+     reset-sandi
+     │      │       ├── (customer)/                  # checkout, pesanan, pesanan/[kode], chat,
+
+
+
+
+                                                                                                        Page 10 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+     akun
+     │   │          ├── admin-toko/                          # dashboard, produk, stok, pesanan,
+     keuangan, chat, pengaturan
+     │   │   ├── super-admin/                                # dashboard, verifikasi, toko, kategori,
+     banner, audit-log, pengaturan
+     │   │   ├── layout.jsx
+     │      │   └── globals.css
+     │      ├── components/
+     │   │   ├── ui/                                         # Button, Input, Modal, Toast, Skeleton,
+     Table, Badge
+     │   │   ├── layout/                                     # Header, MegaMenu, Footer, Sidebar,
+     NotificationBell
+     │   │   ├── home/                   # HeroCarousel, FeatureStrip,
+     CategoryRail, DealsRow, BestSellers
+     │   │   ├── product/                                    # ProductCard, Gallery, Filters,
+     ReviewList
+     │      │   └── cart/               order/      chat/   finance/
+     │      ├── lib/                                         # api.js (fetch wrapper), socket.js,
+     format.js
+     │   ├── context/                                        # AuthContext, CartContext
+     │      ├── hooks/
+     │      ├── public/
+     │      └── package.json                  tailwind.config.js   next.config.js    .env.local.example
+     │
+     ├── backend/                                            # Express API + Socket.IO
+     │   ├── src/
+     │   │   ├── config/                                     # env.js, db.js (pool mysql2)
+     │   │   ├── routes/                # auth, superAdmin, store, catalog, cart,
+     orders, chat, finance, notifications
+     │   │   ├── controllers/                                # tipis: baca request, panggil service,
+     kirim response
+     │   │   ├── services/                                   # aturan bisnis: orderService,
+     stockService, financeService
+     │   │   ├── middlewares/           # authenticate, authorize, storeScope,
+     validate, upload, rateLimit, errorHandler
+     │      │       ├── validators/                          # skema zod per modul
+     │      │       ├── sockets/                             # chat.js
+     │      │       ├── utils/                               # jwt, hash, slug, excel, mailer, logger
+     │      │       ├── app.js
+     │      │   └── server.js
+     │      ├── uploads/                                     # foto produk dan logo (masuk .gitignore)
+     │      └── package.json                  .env.example
+     │
+
+
+
+                                                                                                    Page 11 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+     ├── database/
+     │   ├── schema.sql                                      # semua tabel, indeks, foreign key
+     │      ├── seed.sql                                     # Super Admin, kategori, pengaturan
+     │      └── seed_demo.sql                                # opsional, data contoh, terpisah dari
+     seed.sql
+     │
+     ├── docs/PRD.md
+     └── README.md
+
+
+         Lapisan backend: route memanggil controller, controller memanggil service, service
+         menjalankan SQL. Transaksi database (checkout, konfirmasi lunas, penyesuaian stok)
+         hanya ada di service.
+         Variabel lingkungan backend: PORT , DB_HOST , DB_USER , DB_PASSWORD , DB_NAME ,
+          JWT_SECRET , CLIENT_ORIGIN , UPLOAD_DIR , SMTP_* (opsional).
+         Variabel lingkungan frontend: NEXT_PUBLIC_API_URL , NEXT_PUBLIC_SOCKET_URL .
+         Pilihan Next.js: halaman produk dan toko diuntungkan render di server untuk SEO.
+         Jika Anda lebih suka React + Vite, ganti satu baris di Prompt 0.
+
+
+  Skema database MySQL
+  Database memakai 20 tabel; satu user Admin Toko memiliki satu toko, satu produk milik
+  satu toko, dan satu pesanan milik satu customer dan satu toko.
+
+
+     Tabel                                 Kolom utama                          Aturan penting
+
+     users                                 id, role (super_admin, admin_toko,   Sandi di-hash bcrypt; email
+                                           customer), name, email,              unik di semua peran.
+                                           password_hash, phone, status
+                                           (active, suspended, deleted),
+                                           last_login_at, deleted_at
+
+     password_resets                       id, user_id, token_hash,             Token disimpan sebagai hash
+                                           expires_at, used_at                  dan sekali pakai.
+
+
+
+
+                                                                                                          Page 12 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+     Tabel                                 Kolom utama                         Aturan penting
+
+     stores                                id, owner_user_id, name, slug,      owner_user_id unik.
+                                           description, logo_url, city,        last_active_at diperbarui saat
+                                           address, cod_area_note, phone,      login dan saat ada pesanan;
+                                           status (pending, approved,          dipakai untuk menandai toko
+                                           rejected, suspended),               tidak aktif.
+                                           rejection_reason, verified_by,
+                                           verified_at, last_active_at,
+                                           deleted_at
+
+     categories                            id, parent_id, name, slug, icon,    Maksimal dua level.
+                                           sort_order, is_active
+
+     products                              id, store_id, category_id, name,    Hapus berarti arsip. Stok
+                                           slug, description, price,           tersedia = stock dikurangi
+                                           compare_price, sku, stock,          reserved. Indeks (store_id,
+                                           reserved, low_stock_threshold,      status) dan FULLTEXT (name,
+                                           status (active, draft, archived),   description).
+                                           sold_count, rating_avg,
+                                           rating_count, deleted_at
+
+     product_images                        id, product_id, url, sort_order,    Maksimal 5 foto per produk,
+                                           is_primary                          dicek di service.
+
+     stock_movements                       id, product_id, store_id, type      Hanya tambah baris, tidak
+                                           (masuk, kurang, koreksi,            pernah diubah.
+                                           penjualan, batal), qty,
+                                           balance_after, note, order_id,
+                                           created_by, created_at
+
+     cart_items                            id, user_id, product_id, qty,       Unik pada (user_id,
+                                           created_at                          product_id).
+
+     orders                                id, code, customer_id, store_id,    code unik berbentuk INV-
+                                           status (pending, confirmed, paid,   20261106-0001. Satu pesanan
+                                           completed, cancelled), subtotal,    satu toko. Indeks (store_id,
+                                           total, payment_method               status, created_at).
+                                           (cod_cash), meeting_location,
+                                           meeting_at, customer_note,
+                                           cancel_reason, confirmed_at,
+                                           paid_at, completed_at,
+                                           cancelled_at
+
+
+
+
+                                                                                                           Page 13 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+     Tabel                                 Kolom utama                             Aturan penting
+
+     order_items                           id, order_id, product_id,               Menyalin nama dan harga saat
+                                           product_name, unit_price, qty,          checkout, jadi tidak berubah
+                                           line_total, image_url                   walau produk diedit.
+
+     order_status_history                  id, order_id, from_status,              Sumber linimasa pesanan.
+                                           to_status, actor_user_id, note,
+                                           created_at
+
+     chat_threads                          id, store_id, customer_id,              Unik pada (store_id,
+                                           last_message_at, store_unread,          customer_id).
+                                           customer_unread
+
+     chat_messages                         id, thread_id, sender_id, order_id,     order_id opsional, untuk
+                                           type (text, product, system),           memberi konteks pesanan.
+                                           body, read_at, created_at
+
+     finance_transactions                  id, store_id, type (income,             Pemasukan otomatis memuat
+                                           expense), category, amount,             order_id yang unik, sehingga
+                                           description, trx_date, order_id,        satu pesanan hanya sekali
+                                           created_by, deleted_at                  menjadi pemasukan.
+                                                                                   Pengeluaran dicatat manual.
+
+     reviews                               id, product_id, order_id,               Unik pada (order_id,
+                                           customer_id, rating (1 sampai 5),       product_id); hanya untuk
+                                           comment, created_at                     pesanan completed.
+
+     wishlists                             user_id, product_id, created_at         Tahap 2.
+
+     notifications                         id, user_id, type, title, body, link,   Dibuat oleh service saat ada
+                                           is_read, created_at                     kejadian.
+
+     banners                               id, title, subtitle, cta_label,         Dikelola Super Admin.
+                                           cta_link, image_url, placement
+                                           (hero, promo), sort_order,
+                                           is_active
+
+     audit_logs                            id, actor_user_id, action,              Hanya tambah baris.
+                                           target_type, target_id, meta
+                                           (JSON), ip_address, created_at
+
+     settings                              key, value                              Contoh: inactive_days = 30.
+
+
+
+
+                                                                                                              Page 14 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+  Aturan data kunci
+         Semua nominal uang memakai DECIMAL(12,2), bukan FLOAT.
+         Setiap query Admin Toko wajib disaring dengan store_id milik akunnya.
+         Checkout (satu transaksi per toko): kunci baris produk, pastikan stock dikurangi
+         reserved cukup, tambah reserved, buat orders dan order_items, hapus item itu dari
+         keranjang.
+         Konfirmasi lunas (satu transaksi): kunci baris produk, kurangi stock dan reserved,
+         tambah sold_count, tulis stock_movements, buat finance_transactions bertipe
+         income, ubah status, tulis order_status_history, buat notifikasi. Jika satu langkah
+         gagal, semuanya dibatalkan.
+         Pembatalan: kurangi reserved, ubah status, tulis riwayat dan notifikasi.
+
+
+  Rancangan API
+  Semua endpoint berawalan /api , memakai JSON, dan mengembalikan bentuk yang sama:
+  { success, data, message } saat berhasil dan { success: false, message, errors
+  } saat gagal. Daftar dibatasi dengan page dan limit .
+
+
+     Endpoint                                             Peran           Fungsi
+
+     POST /auth/register                                  Publik          Daftar customer
+                                                                          (CU1)
+
+     POST /auth/register-store                            Publik          Daftar akun Admin
+                                                                          Toko beserta tokonya,
+                                                                          status Menunggu
+                                                                          (AT1)
+
+     POST /auth/login , POST /auth/logout , GET           Publik,         Masuk dengan cookie
+     /auth/me                                             semua           httpOnly, keluar,
+                                                                          profil dan peran (SA1,
+                                                                          AT2, CU2)
+
+     PATCH /auth/password , PATCH /auth/email             Semua           Ubah sandi dan email;
+                                                                          sandi lama wajib
+                                                                          (SA4, AT4)
+
+     POST /auth/forgot-password , POST                    Publik          Lupa sandi lewat
+     /auth/reset-password                                                 token (X1)
+
+
+
+
+                                                                                             Page 15 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+     Endpoint                                       Peran         Fungsi
+
+     GET /admin/stats                               Super Admin   Angka dashboard
+                                                                  (X15)
+
+     GET /admin/stores?status=&q=                   Super Admin   Daftar toko dan
+                                                                  penanda tidak aktif
+                                                                  (SA3)
+
+     PATCH /admin/stores/:id/approve , /reject ,    Super Admin   Setujui, tolak dengan
+     /suspend                                                     alasan, tangguhkan
+                                                                  atau aktifkan kembali
+                                                                  (SA2, X3)
+
+     DELETE /admin/stores/:id                       Super Admin   Hapus toko tidak
+                                                                  aktif, soft delete
+                                                                  (SA3)
+
+     GET, POST, PATCH, DELETE /admin/categories ,   Super Admin   Kelola kategori dan
+     /admin/banners                                               banner (X16)
+
+     GET /admin/audit-logs , GET dan PATCH          Super Admin   Audit log dan
+     /admin/settings                                              pengaturan, misalnya
+                                                                  batas hari tidak aktif
+                                                                  (X2)
+
+     GET dan PATCH /store/profile , GET             Admin Toko    Profil toko dan
+     /store/dashboard                                             ringkasan dashboard
+                                                                  (AT4)
+
+     GET dan POST /store/products , GET, PATCH,     Admin Toko    Upload dan kelola
+     DELETE /store/products/:id                                   produk (AT3.1)
+
+     POST dan DELETE /store/products/:id/images     Admin Toko    Tambah dan hapus
+                                                                  foto produk
+
+     POST /store/products/:id/stock , GET           Admin Toko    Tambah, kurangi,
+     /store/products/:id/stock-history                            koreksi stok dan
+                                                                  riwayatnya (AT3.2)
+
+     GET /store/orders , GET /store/orders/:id      Admin Toko    Daftar dan detail
+                                                                  pesanan toko
+
+     PATCH /store/orders/:id/confirm                Admin Toko    Terima pesanan dan
+                                                                  isi lokasi serta jadwal
+                                                                  COD (AT5.1)
+
+
+
+                                                                                       Page 16 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+     Endpoint                                         Peran        Fungsi
+
+     PATCH /store/orders/:id/paid                     Admin Toko   Konfirmasi lunas; stok
+                                                                   berkurang otomatis
+                                                                   (AT3.3, AT3.4, AT5.3)
+
+     PATCH /store/orders/:id/cancel                   Admin Toko   Batalkan dengan
+                                                                   alasan (X10)
+
+     GET /store/finance/summary , GET, POST, PATCH,   Admin Toko   Ringkasan dan
+     DELETE /store/finance/transactions                            catatan pemasukan
+                                                                   serta pengeluaran
+                                                                   (AT3.5, X14)
+
+     GET /store/finance/export?from=&to=              Admin Toko   Unduh Excel (AT3.6)
+
+     GET /catalog/home                                Publik       Data beranda: banner,
+                                                                   kategori, produk
+                                                                   diskon, terlaris,
+                                                                   statistik (X16)
+
+     GET /catalog/products?                           Publik       Pencarian dan filter
+     q=&category=&city=&minPrice=&maxPrice=&sort=                  (X4, X17)
+     &page=
+
+     GET /catalog/products/:slug , GET                Publik       Detail produk,
+     /catalog/stores/:slug , GET                                   halaman toko, daftar
+     /catalog/categories                                           kategori (X5)
+
+     GET, POST, PATCH, DELETE /cart                   Customer     Keranjang (CU3)
+
+     POST /orders/checkout                            Customer     Checkout, dipecah
+                                                                   per toko (CU4)
+
+     GET /orders , GET /orders/:code                  Customer     Daftar dan detail
+                                                                   pesanan beserta
+                                                                   linimasa (X11)
+
+     PATCH /orders/:code/cancel , PATCH               Customer     Batalkan sebelum
+     /orders/:code/received                                        disepakati; Barang
+                                                                   diterima (CU7)
+
+     POST /orders/:code/reviews                       Customer     Ulasan setelah
+                                                                   pesanan selesai (X8)
+
+
+
+
+                                                                                       Page 17 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+     Endpoint                                                Peran         Fungsi
+
+     POST dan GET /chat/threads , GET                        Customer,     Buka thread, riwayat,
+     /chat/threads/:id/messages , PATCH                      Admin Toko    tandai terbaca (CU5,
+     /chat/threads/:id/read                                                X12)
+
+     GET /notifications , PATCH                              Semua         Notifikasi dalam
+     /notifications/:id/read , PATCH                                       aplikasi (X13)
+     /notifications/read-all
+
+
+  Event Socket.IO. Autentikasi memakai cookie saat handshake. Klien mengirim
+  message:send , message:read , dan typing ; server mengirim message:new ,
+   message:read , typing , dan notification:new . Pengguna hanya bisa bergabung ke
+  ruang thread miliknya sendiri.
+
+
+  Keamanan dan non-fungsional
+  Aturan paling penting adalah isolasi data antar toko: store_id selalu diambil dari akun
+  yang login di server, tidak pernah dari input klien.
+
+
+  Keamanan
+         Sandi: bcrypt dengan cost 12, minimal 8 karakter.
+         Sesi: JWT di cookie httpOnly, Secure di produksi, SameSite=Lax , berlaku 7 hari;
+         logout menghapus cookie.
+         Otorisasi: middleware authenticate , lalu authorize(role) , lalu storeScope untuk
+         rute Admin Toko.
+         Validasi: semua input divalidasi dengan zod di backend; SQL memakai placeholder,
+         tidak pernah menggabung string.
+         Perlindungan HTTP: helmet, CORS hanya untuk CLIENT_ORIGIN , rate limit ketat pada
+         login, daftar, dan lupa sandi, lebih longgar pada API lain.
+         Upload: hanya jpg, png, webp, maksimal 2 MB, nama file diacak, tipe dicek dari isi file,
+         ukuran diperkecil dengan sharp.
+         Pesan error: login gagal selalu memakai pesan yang sama; detail teknis hanya ke log
+         server.
+         Rahasia: disimpan di .env , tidak masuk Git; .env.example disediakan.
+
+
+
+
+                                                                                              Page 18 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+  Non-fungsional
+         Performa: indeks pada kolom filter, paginasi wajib, gambar lazy-load dalam WebP,
+         skeleton saat memuat.
+         Responsif dan aksesibel: ponsel sampai desktop, target sentuh minimal 44 px, label
+         form, kontras cukup, navigasi keyboard, teks alt pada gambar.
+         Keandalan: transaksi database untuk checkout, konfirmasi lunas, dan pembatalan;
+         error handler terpusat; log terstruktur.
+         Kualitas kode: ESLint dan Prettier, pesan antarmuka berbahasa Indonesia, tidak ada
+         data tiruan di kode (data contoh hanya di seed_demo.sql ).
+         Pencadangan: README menjelaskan cadangan database dengan mysqldump .
+
+
+  Skema prompt
+  Jalankan 13 prompt berurutan: Prompt 0 ditempel lebih dulu di setiap percakapan baru,
+  lalu Prompt 1 sampai 12 satu per satu.
+
+         Konteks: lampirkan dokumen ini (atau simpan bagian Peran sampai Keamanan sebagai
+         docs/PRD.md ) bersama Prompt 0, karena prompt tahap merujuk ke kode kebutuhan
+         (SA, AT, CU, X) dan nama tabel di PRD.
+         Satu tahap, satu sesi kerja: jangan lanjut sebelum semua Kriteria selesai pada tahap
+         itu terpenuhi.
+         Setelah tiap tahap: jalankan server, coba manual, lalu commit ke Git.
+         Jika hasil menyimpang: minta perbaikan di sesi yang sama dengan menyebut kode
+         kebutuhan, misalnya perbaiki AT3.4.
+         Urutan: tahap 1 sampai 7 untuk database dan backend, 8 sampai 11 untuk frontend, 12
+         untuk QA.
+
+
+  Prompt 0 — Konteks tetap
+
+     PERAN
+     Kamu adalah senior full-stack engineer. Bantu saya membangun marketplace
+     multi-toko dengan pembayaran COD tunai, tahap demi tahap. Kerjakan hanya
+     tahap yang saya minta, jangan melompat ke tahap lain.
+
+     PRODUK
+     Tiga peran: Super Admin (verifikasi dan pantau toko), Admin Toko (kelola
+     produk, stok, pesanan COD, keuangan), Customer (belanja, chat, bayar tunai).
+     Pembayaran hanya COD tunai: pembeli dan penjual bertemu langsung, lalu Admin
+
+
+
+                                                                                         Page 19 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+     Toko menekan Konfirmasi lunas. Detail ada di PRD terlampir; kode kebutuhan
+     (SA, AT, CU, X) merujuk ke tabel di PRD.
+
+     STACK (WAJIB)
+     - Bahasa: JavaScript, tanpa TypeScript.
+     - Frontend: Next.js App Router + Tailwind CSS, di folder frontend/.
+     - Backend: Node.js + Express + Socket.IO + mysql2 (promise), di folder
+     backend/.
+     - Database: MySQL, file SQL di folder database/, bisa diimpor lewat
+     phpMyAdmin.
+     - Frontend dan backend terpisah total; komunikasi hanya lewat REST API (/api)
+     dan Socket.IO.
+
+
+     ATURAN KODE
+     1. Ikuti struktur folder di PRD persis. Jangan menambah folder tingkat atas.
+     2. Backend berlapis: route, controller, service, SQL. Transaksi database
+     hanya di service.
+     3. Semua SQL memakai placeholder (?). Validasi input dengan zod di setiap
+     endpoint.
+     4. Format response: { success, data, message } dan { success: false, message,
+     errors }.
+     5. store_id Admin Toko selalu diambil dari akun yang login, tidak pernah dari
+     body, query, atau params.
+     6. Tidak ada data tiruan di kode. Semua data dari MySQL. Data contoh hanya di
+     database/seed_demo.sql.
+     7. Teks antarmuka berbahasa Indonesia; nama variabel, tabel, dan endpoint
+     berbahasa Inggris sesuai PRD.
+     8. Rahasia lewat .env; sediakan .env.example. Jangan menulis kredensial di
+     kode.
+     9. Beri komentar singkat hanya pada logika bisnis yang tidak jelas dengan
+     sendirinya.
+
+     TAMPILAN
+     Modern, bersih, profesional, tidak terlihat seperti template AI. Ikuti token
+     desain dan pemetaan blok beranda di PRD. Mobile-first, animasi halus (150
+     sampai 250 ms), skeleton saat memuat, tombol dengan status loading dan
+     disabled, empty state yang informatif, toast untuk hasil aksi.
+
+
+     CARA MENJAWAB
+     1. Mulai dengan daftar file yang akan dibuat atau diubah.
+     2. Tulis file lengkap (bukan potongan), siap disalin ke VS Code.
+     3. Akhiri dengan: perintah untuk menjalankan, cara mengujinya, dan daftar
+     Kriteria selesai yang sudah terpenuhi.
+
+
+
+                                                                                 Page 20 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+     4. Jika ada keputusan yang tidak ada di PRD, pilih opsi paling aman dan
+     sebutkan dalam satu kalimat; jangan berhenti bertanya kecuali benar-benar
+     terblokir.
+
+
+     Balas SIAP jika sudah paham, lalu tunggu prompt tahap.
+
+
+
+
+  Prompt backend (tahap 1 sampai 7)
+  Tahap 1 sampai 7 membangun database dan API; mulai frontend hanya setelah semua
+  Kriteria selesai tahap 7 terpenuhi.
+
+
+
+
+                                                                                 Page 21 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+  Prompt 1 — Fondasi proyek dan database
+
+     TAHAP 1 — Fondasi proyek dan database
+     Tujuan: kerangka proyek berjalan dan database siap diimpor.
+
+
+     Kerjakan:
+     1. Buat struktur folder marketplace/ persis seperti bagian Arsitektur di PRD,
+     termasuk .gitignore (node_modules, .env, backend/uploads/*), README awal, dan
+     docs/PRD.md.
+     2. database/schema.sql: 20 tabel pada bagian Skema database, lengkap dengan
+     tipe data, PRIMARY KEY, FOREIGN KEY (riwayat seperti order_items dan
+     stock_movements tidak boleh ikut terhapus), UNIQUE, indeks, dan FULLTEXT pada
+     products. Gunakan InnoDB dan utf8mb4. Semua nominal uang DECIMAL(12,2).
+     3. database/seed.sql: satu akun Super Admin (email dan sandi awal dicatat di
+     README; hash bcrypt dibuat lewat skrip backend/src/utils/generateHash.js), 8
+     kategori awal (Elektronik, Rumah dan Dapur, Fashion, Kecantikan, Olahraga,
+     Mainan, Otomotif, Hewan Peliharaan) beserta ikon, dan pengaturan
+     inactive_days = 30.
+     4. database/seed_demo.sql: opsional dan terpisah; 2 toko disetujui, 10
+     produk, 1 customer. Beri komentar bahwa file ini hanya untuk demo.
+     5. Backend: package.json, src/config/env.js (validasi variabel lingkungan
+     saat start), src/config/db.js (pool mysql2 dan helper transaksi), app.js
+     (helmet, cors, json, cookie-parser, GET /api/health), server.js, dan error
+     handler terpusat.
+     6. Frontend: inisialisasi Next.js (App Router, JavaScript) + Tailwind,
+     lib/api.js (fetch wrapper dengan credentials: include), dan halaman beranda
+     sementara.
+
+     Hasil: semua file di atas, plus README berisi langkah import SQL lewat
+     phpMyAdmin dan cara menjalankan kedua server.
+
+     Kriteria selesai:
+     - Import schema.sql lalu seed.sql di phpMyAdmin berhasil tanpa error.
+     - GET /api/health mengembalikan { success: true } dan memeriksa koneksi
+     database.
+     - Frontend berjalan di port 3000, backend di port 5000, dan frontend berhasil
+     memanggil /api/health.
+
+
+
+
+                                                                                 Page 22 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+  Prompt 2 — Autentikasi dan keamanan inti
+
+     TAHAP 2 — Autentikasi dan keamanan inti (SA1, SA4, AT1, AT2, CU1, CU2, X1)
+
+
+     Kerjakan:
+     1. Middleware: authenticate (baca JWT dari cookie httpOnly),
+     authorize(...roles), storeScope (ambil toko milik akun; tolak jika toko belum
+     berstatus approved), validate(schema) dengan zod, rateLimit (ketat untuk
+     auth: 10 percobaan per 15 menit per IP), dan errorHandler.
+     2. Endpoint /api/auth/* sesuai tabel API: register, register-store (buat user
+     admin_toko dan stores berstatus pending dalam satu transaksi), login, logout,
+     me, password, email, forgot-password, reset-password.
+     3. Aturan login: pesan error sama untuk email atau sandi salah; akun
+     suspended atau deleted ditolak; Admin Toko yang tokonya pending, rejected,
+     atau suspended tetap bisa login, tetapi /auth/me mengembalikan storeStatus
+     dan rute /store/* menolaknya dengan 403 beserta pesan yang jelas.
+     4. Sandi: bcrypt cost 12, minimal 8 karakter. Ubah sandi dan ubah email wajib
+     sandi lama; email baru dicek unik.
+     5. Lupa sandi: token acak 32 byte, simpan hash-nya di password_resets,
+     kedaluwarsa 1 jam, sekali pakai. Email dikirim lewat utils/mailer.js memakai
+     SMTP dari .env; jika SMTP kosong, cetak tautan reset ke log server (mode
+     pengembangan).
+     6. Perbarui users.last_login_at dan stores.last_active_at saat login.
+     7. utils/audit.js: fungsi writeAudit(actor, action, targetType, targetId,
+     meta, ip) untuk dipakai tahap berikutnya.
+
+     Kriteria selesai:
+     - Customer dan Admin Toko bisa daftar; Admin Toko baru berstatus pending.
+     - Login mengeset cookie httpOnly; /api/auth/me mengembalikan role.
+     - Rute dengan peran salah mengembalikan 403; tanpa login 401.
+     - Percobaan login ke-11 dalam 15 menit ditolak.
+     - Setiap endpoint punya contoh request di backend/requests.http (REST
+     Client).
+
+
+
+
+                                                                                 Page 23 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+  Prompt 3 — Backend Super Admin
+
+     TAHAP 3 — Backend Super Admin (SA2, SA3, X2, X3, X15, X16)
+
+     Kerjakan:
+     1. GET /api/admin/stores: filter status dan q (nama toko atau email pemilik),
+     paginasi. Tiap baris memuat status, kota, jumlah produk, jumlah pesanan,
+     last_active_at, dan flag isInactive (true jika last_active_at lebih lama dari
+     settings.inactive_days dan tidak ada pesanan dalam rentang itu).
+     2. PATCH /api/admin/stores/:id/approve, /reject, /suspend: ubah status, isi
+     verified_by dan verified_at, reject wajib alasan, tulis audit log, buat
+     notifikasi untuk pemilik toko. Transisi tidak valid ditolak dengan 409.
+     3. DELETE /api/admin/stores/:id: soft delete toko dan akun pemiliknya; hanya
+     boleh jika toko isInactive atau berstatus rejected, dan ditolak bila masih
+     ada pesanan berstatus pending, confirmed, atau paid. Wajib body { confirm:
+     true } dan alasan; tulis audit log.
+     4. CRUD kategori (dua level; tolak hapus kategori yang masih dipakai produk)
+     dan banner (placement hero atau promo, urutan, aktif atau tidak, upload
+     gambar).
+     5. GET /api/admin/stats: jumlah toko per status, toko tidak aktif, pesanan
+     total dan pesanan selesai 30 hari terakhir, jumlah customer.
+     6. GET dan PATCH /api/admin/settings, GET /api/admin/audit-logs (filter aksi
+     dan tanggal).
+     7. services/notificationService.js dan endpoint /api/notifications (daftar,
+     tandai dibaca, tandai semua dibaca).
+
+
+     Kriteria selesai:
+     - Toko pending bisa disetujui, dan sesudahnya pemiliknya mendapat akses ke
+     /api/store/*.
+     - Penolakan tanpa alasan ditolak dengan 422.
+     - Hapus toko aktif ditolak; hapus toko tidak aktif berhasil dan tercatat di
+     audit_logs.
+     - Semua endpoint /api/admin/* mengembalikan 403 untuk selain Super Admin.
+
+
+
+
+                                                                                 Page 24 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+  Prompt 4 — Produk, stok, dan katalog publik
+
+     TAHAP 4 — Produk, stok, dan katalog publik (AT3.1, AT3.2, X4 sampai X7, X17)
+
+
+     Kerjakan:
+     1. Upload: multer (memori), validasi tipe dari isi file (jpg, png, webp),
+     maksimal 2 MB, ubah ukuran dan konversi ke WebP dengan sharp, simpan di
+     backend/uploads/ dengan nama acak, sajikan lewat /uploads statis.
+     2. /api/store/products: buat, daftar (filter status, kategori, q; paginasi),
+     detail, ubah, hapus (arsip: isi deleted_at dan status archived). Slug unik
+     dari nama. Maksimal 5 foto, satu foto utama, urutan foto bisa diubah.
+     3. Stok: POST /api/store/products/:id/stock dengan { type: masuk | kurang |
+     koreksi, qty, note }. Stok tidak boleh negatif dan tidak boleh di bawah
+     reserved. Setiap perubahan menulis stock_movements dengan balance_after,
+     dalam transaksi dengan baris produk dikunci. GET .../stock-history dengan
+     paginasi.
+     4. Daftar stok menipis: produk dengan stock dikurangi reserved <=
+     low_stock_threshold.
+     5. Katalog publik /api/catalog/*: hanya produk dari toko approved yang tidak
+     deleted dengan status active; produk tersedia 0 tetap tampil bertanda Habis.
+     Pencarian, filter kategori (termasuk anak kategori), kota, rentang harga,
+     urutan (terbaru, terlaris, harga naik, harga turun), paginasi. Detail produk
+     by slug (foto, toko, ulasan terbaru, rating), halaman toko by slug, dan GET
+     /api/catalog/home yang menggabungkan banner hero, banner promo, kategori,
+     produk diskon (compare_price > price, dengan persen diskon), terlaris per
+     kategori, dan statistik (jumlah toko approved, pesanan completed, rata-rata
+     rating) dari database.
+
+
+     Kriteria selesai:
+     - Admin Toko hanya melihat dan mengubah produk tokonya; id produk toko lain
+     mengembalikan 404.
+     - Stok tidak bisa dikurangi di bawah reserved atau di bawah nol.
+     - Produk dari toko pending atau suspended tidak muncul di katalog publik.
+     - /api/catalog/home mengembalikan semua blok yang dibutuhkan beranda dalam
+     satu response.
+
+
+
+
+                                                                                 Page 25 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+  Prompt 5 — Keranjang, checkout, dan alur pesanan COD
+
+     TAHAP 5 — Keranjang, checkout, dan alur pesanan COD (CU3 sampai CU7, AT3.3,
+     AT3.4, AT5.1 sampai AT5.3, X8 sampai X11)
+
+
+     Kerjakan:
+     1. /api/cart: tambah (cek stok tersedia), ubah qty, hapus, dan daftar yang
+     dikelompokkan per toko dengan subtotal. Tolak produk milik toko yang tidak
+     approved.
+     2. POST /api/orders/checkout: untuk setiap toko di keranjang, dalam satu
+     transaksi: kunci baris produk, cek stock dikurangi reserved >= qty, tambah
+     reserved, buat orders (code INV-YYYYMMDD-nnnn) dan order_items (salinan nama,
+     harga, foto), hapus item itu dari keranjang, tulis order_status_history
+     (pending), kirim notifikasi ke Admin Toko. Customer boleh mengisi catatan.
+     Jika belum ada, buat chat thread antara customer dan toko beserta pesan
+     system berisi kode pesanan.
+     3. Admin Toko: /api/store/orders (daftar dengan filter status dan paginasi,
+     detail dengan item dan linimasa); PATCH .../confirm (pending ke confirmed,
+     wajib meeting_location dan meeting_at); PATCH .../paid (confirmed ke paid);
+     PATCH .../cancel (alasan wajib).
+     4. Konfirmasi lunas adalah satu transaksi: kunci produk, kurangi stock dan
+     reserved, tambah sold_count, tulis stock_movements (type penjualan), buat
+     finance_transactions bertipe income dengan order_id (tidak boleh ganda), ubah
+     status, tulis riwayat, notifikasi ke customer, perbarui
+     stores.last_active_at. Jika satu langkah gagal, rollback semuanya.
+     5. Customer: GET /api/orders, GET /api/orders/:code (dengan linimasa), PATCH
+     .../cancel (hanya saat pending atau confirmed; kembalikan reserved), PATCH
+     .../received (paid ke completed).
+     6. Ulasan: POST /api/orders/:code/reviews hanya untuk pesanan completed, satu
+     ulasan per produk per pesanan, lalu perbarui rating_avg dan rating_count
+     produk.
+     7. Mesin status di satu tempat (services/orderStateMachine.js): transisi yang
+     diizinkan, siapa yang boleh, dan efek sampingnya. Transisi lain ditolak
+     dengan 409.
+
+
+     Kriteria selesai:
+     - Dua customer memesan stok terakhir bersamaan: hanya satu berhasil (uji
+     dengan dua request paralel).
+     - Setelah Konfirmasi lunas: stock dan reserved berkurang, sold_count naik,
+
+
+
+
+                                                                              Page 26 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+     dan ada tepat satu baris income.
+     - Menekan Konfirmasi lunas dua kali tidak menggandakan apa pun.
+     - Pembatalan mengembalikan stok yang ditahan.
+     - Admin Toko tidak bisa menyentuh pesanan toko lain.
+
+
+
+  Prompt 6 — Chat real-time dan notifikasi
+
+     TAHAP 6 — Chat real-time dan notifikasi (CU5, X12, X13)
+
+
+     Kerjakan:
+     1. sockets/chat.js: autentikasi dari cookie saat handshake; pengguna otomatis
+     bergabung ke ruang user:{id} dan ruang thread miliknya. Event: message:send,
+     message:new, message:read, typing, notification:new.
+     2. REST: POST /api/chat/threads (customer membuka thread dengan toko; jika
+     sudah ada, kembalikan yang ada), GET /api/chat/threads (daftar dengan pesan
+     terakhir dan jumlah belum dibaca), GET /api/chat/threads/:id/messages
+     (paginasi), PATCH /api/chat/threads/:id/read.
+     3. Tipe pesan: text, product (kartu produk), dan system (otomatis saat status
+     pesanan berubah). order_id opsional agar chat bisa dikaitkan ke pesanan.
+     4. Akses: hanya customer dan Admin Toko pemilik thread yang boleh membaca dan
+     mengirim.
+     5. Batasi panjang pesan 1000 karakter dan beri rate limit pengiriman.
+     6. Hubungkan notificationService ke socket supaya notification:new terkirim
+     real-time.
+
+
+     Kriteria selesai:
+     - Dua browser (customer dan Admin Toko) saling menerima pesan tanpa refresh.
+     - Jumlah belum dibaca naik dan turun dengan benar.
+     - Pengguna lain yang mencoba bergabung ke thread bukan miliknya ditolak.
+
+
+
+
+                                                                              Page 27 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+  Prompt 7 — Keuangan dan Excel
+
+     TAHAP 7 — Keuangan dan Excel (AT3.5, AT3.6, X14)
+
+
+     Kerjakan:
+     1. GET /api/store/finance/summary?from=&to=: total pemasukan, total
+     pengeluaran, laba bersih, jumlah pesanan lunas, deret harian atau bulanan
+     untuk grafik, pengeluaran per kategori, dan 5 produk terlaris pada periode
+     itu.
+     2. CRUD /api/store/finance/transactions dengan filter tipe, kategori,
+     tanggal, dan paginasi. Pemasukan otomatis (punya order_id) tidak boleh diubah
+     atau dihapus manual; pengeluaran boleh (soft delete).
+     3. GET /api/store/finance/export?from=&to=: file .xlsx dengan exceljs berisi
+     tiga sheet: Ringkasan, Pemasukan (kode pesanan, tanggal, produk, nominal),
+     dan Pengeluaran (tanggal, kategori, catatan, nominal). Format Rupiah, lebar
+     kolom rapi, header tebal, baris total. Nama file keuangan-{slug-toko}-{from}-
+     {to}.xlsx.
+     4. GET /api/store/dashboard: ringkasan hari ini dan bulan ini, pesanan yang
+     menunggu tindakan (pending dan confirmed), dan produk stok menipis.
+
+
+     Kriteria selesai:
+     - Angka di ringkasan sama dengan jumlah baris di sheet Excel.
+     - Admin Toko A tidak pernah melihat atau mengekspor data toko B.
+     - File Excel terbuka normal di Microsoft Excel dan Google Sheets.
+
+
+
+
+  Prompt frontend (tahap 8 sampai 11)
+  Frontend dibangun di atas API yang sudah lulus uji; setiap halaman wajib menangani state
+  memuat, kosong, dan error.
+
+
+
+
+                                                                                     Page 28 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+  Prompt 8 — Fondasi frontend dan beranda sesuai referensi
+
+     TAHAP 8 — Fondasi frontend dan beranda sesuai referensi (X16)
+
+
+     Kerjakan:
+     1. Tailwind: tema dari token desain di PRD (warna, font Plus Jakarta Sans
+     lewat next/font, radius, bayangan). Instal lucide-react, framer-motion,
+     react-hook-form, zod, @hookform/resolvers, recharts, socket.io-client.
+     2. components/ui: Button (varian dan loading), Input, Select, Textarea, Modal
+     konfirmasi, Toast, Skeleton, Badge status, Table responsif, Pagination,
+     EmptyState.
+     3. context/AuthContext (ambil /auth/me, login, logout, penjaga rute per
+     peran) dan CartContext (jumlah badge, sinkron dengan server). Arahkan
+     pengguna yang belum login atau salah peran lewat middleware Next.js atau
+     penjaga di layout.
+     4. Layout: Header (logo, pencarian dengan dropdown kategori, menu akun,
+     Pesanan, lonceng notifikasi, keranjang dengan badge), bar navigasi kedua,
+     MegaMenu kategori, Footer, dan versi mobile dengan drawer.
+     5. Beranda / memanggil /api/catalog/home dan merender semua blok pada tabel
+     Desain UI secara berurutan: banner hero berputar, strip lima keunggulan,
+     lingkaran kategori, produk diskon, empat banner promo termasuk kartu Buka
+     Toko Anda, strip Cara Belanja, terlaris dengan tab kategori, Dipercaya
+     Pembeli, dan footer. Skeleton saat memuat, empty state jika suatu blok
+     kosong.
+     6. ProductCard: foto, badge diskon, nama, bintang rating dan jumlah ulasan,
+     harga, harga coret, nama toko dan kota, tombol + Keranjang (butuh login;
+     arahkan ke halaman masuk bila belum).
+
+
+     Kriteria selesai:
+     - Urutan dan tata letak beranda sesuai gambar referensi, tanpa logo atau teks
+     merek asing.
+     - Semua data beranda dari API; tidak ada array data tiruan di komponen.
+     - Tampil rapi pada lebar 360, 768, dan 1280 px tanpa scroll horizontal.
+
+
+
+
+                                                                                 Page 29 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+  Prompt 9 — Halaman publik dan Customer
+
+     TAHAP 9 — Halaman publik dan Customer (CU1 sampai CU7, X4, X5, X8, X11, X12,
+     X17)
+
+
+     Kerjakan:
+     1. Halaman auth: masuk, daftar, daftar toko (dua langkah: data pemilik lalu
+     data toko), lupa sandi, reset sandi, dan halaman Menunggu verifikasi untuk
+     Admin Toko yang belum disetujui. Validasi form dengan zod; tampilkan error
+     server di bawah kolom yang tepat.
+     2. /cari dan /kategori/[slug]: filter di kiri (kategori, rentang harga,
+     kota), urutan, paginasi, grid produk; filter tersimpan di URL; di ponsel
+     filter menjadi drawer.
+     3. /produk/[slug]: galeri dengan thumbnail, harga dan harga coret, stok
+     tersedia, pilih jumlah, tombol Keranjang dan Chat Penjual, info toko, daftar
+     ulasan.
+     4. /toko/[slug]: profil toko, rating, daftar produk.
+     5. /keranjang: dikelompokkan per toko, ubah jumlah, hapus, subtotal per toko,
+     tombol Checkout.
+     6. /checkout: ringkasan per toko, catatan, penjelasan singkat alur COD,
+     tombol Buat Pesanan; setelah berhasil arahkan ke daftar pesanan.
+     7. /pesanan dan /pesanan/[kode]: tab status, kartu pesanan, detail dengan
+     linimasa status, lokasi dan jadwal bertemu, tombol Chat Toko, Batalkan (saat
+     boleh), Barang Diterima (saat lunas), dan form ulasan (saat selesai).
+     8. /chat: daftar thread dan jendela percakapan real-time (socket.io-client)
+     dengan penanda belum dibaca, kartu produk dalam pesan, dan indikator
+     mengetik; juga tersedia sebagai panel dari detail pesanan.
+     9. /akun: profil, ubah sandi, ubah email.
+
+
+     Kriteria selesai:
+     - Customer baru bisa menjalani alur penuh: daftar, cari, keranjang, checkout,
+     chat, lalu melihat status menjadi lunas dan selesai setelah Admin Toko
+     mengonfirmasi.
+     - Semua halaman menangani state memuat, kosong, dan error.
+     - Keranjang berisi barang dari dua toko menghasilkan dua pesanan.
+
+
+
+
+                                                                                Page 30 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+  Prompt 10 — Dashboard Admin Toko
+
+     TAHAP 10 — Dashboard Admin Toko (AT3.1 sampai AT3.6, AT4, AT5, X7, X14)
+
+     Kerjakan:
+     1. Layout sidebar (Dashboard, Produk, Stok, Pesanan, Keuangan, Chat,
+     Pengaturan) yang menjadi drawer di ponsel; penjaga rute: hanya Admin Toko
+     dengan toko approved.
+     2. Dashboard: kartu pemasukan hari ini dan bulan ini, pesanan menunggu
+     tindakan, produk stok menipis, dan grafik pemasukan dibanding pengeluaran
+     (Recharts).
+     3. Produk: tabel dengan pencarian dan filter; form tambah dan ubah (nama,
+     kategori, deskripsi, harga, harga coret, stok awal, upload hingga 5 foto
+     dengan pratinjau, urutan foto, pilih foto utama); hapus lewat modal
+     konfirmasi (diarsipkan).
+     4. Stok: halaman penyesuaian (tambah, kurangi, koreksi beserta alasan) dan
+     riwayat per produk.
+     5. Pesanan: tab status; detail menampilkan item, nama dan nomor customer,
+     linimasa, tombol Terima Pesanan (dengan input lokasi dan jadwal bertemu),
+     Konfirmasi Lunas (modal yang menyebut total tunai yang harus diterima),
+     Batalkan (alasan wajib), dan Chat Customer.
+     6. Keuangan: ringkasan, grafik, tabel transaksi dengan filter tanggal, form
+     pengeluaran, dan tombol Unduh Excel yang mengikuti filter tanggal aktif.
+     7. Chat (komponen yang sama dengan Customer) dan Pengaturan (profil toko,
+     logo, ubah sandi dan email).
+
+
+     Kriteria selesai:
+     - Seluruh alur AT dapat dijalankan dari antarmuka tanpa Postman.
+     - Tombol aksi menonaktifkan diri saat memproses dan memunculkan toast hasil.
+     - Tabel terbaca baik di ponsel (kartu atau scroll yang terkontrol).
+
+
+
+
+                                                                                 Page 31 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+  Prompt 11 — Dashboard Super Admin
+
+     TAHAP 11 — Dashboard Super Admin (SA1 sampai SA4, X2, X3, X15, X16)
+
+
+     Kerjakan:
+     1. Layout sidebar: Dashboard, Verifikasi Toko, Semua Toko, Kategori, Banner,
+     Audit Log, Pengaturan.
+     2. Dashboard: kartu jumlah toko per status, toko tidak aktif, pesanan 30 hari
+     terakhir, dan jumlah customer.
+     3. Verifikasi Toko (ditonjolkan karena bertanda bintang di catatan): antrean
+     toko pending dengan detail data pemilik dan toko, tombol Setujui dan Tolak
+     (modal dengan alasan wajib), serta lencana jumlah antrean di sidebar.
+     4. Semua Toko: tabel dengan filter status dan pencarian, kolom aktivitas
+     terakhir dan lencana Tidak aktif, aksi Tangguhkan, Aktifkan, dan Hapus (modal
+     dua langkah: ketik nama toko untuk konfirmasi, alasan wajib).
+     5. Kategori dan Banner: CRUD dengan upload gambar; pratinjau banner sama
+     dengan tampilannya di beranda.
+     6. Audit Log dengan filter, dan Pengaturan (batas hari tidak aktif, ubah
+     sandi dan email).
+
+
+     Kriteria selesai:
+     - Toko yang baru mendaftar muncul di antrean (notifikasi real-time atau
+     polling 30 detik).
+     - Setelah disetujui, pemilik toko bisa login dan masuk ke dashboard.
+     - Banner yang diubah tampil di beranda.
+
+
+
+
+  QA akhir dan Checklist Penerimaan
+  Tahap terakhir memeriksa seluruh sistem terhadap 16 skenario di bawah; proyek dianggap
+  selesai jika semuanya lulus.
+
+
+
+
+                                                                                   Page 32 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+  Prompt 12 — QA, polesan, dan dokumentasi
+
+     TAHAP 12 — QA, polesan, dan dokumentasi
+
+
+     Kerjakan:
+     1. Telusuri seluruh kode, laporkan, lalu perbaiki: bug, query Admin Toko
+     tanpa filter store_id, endpoint tanpa authorize, input tanpa validasi,
+     kebocoran data sensitif di response (password_hash tidak boleh pernah
+     keluar), race condition stok, dan query N+1.
+     2. Uji alur penuh dengan tiga akun (Super Admin, Admin Toko, Customer) dan
+     tulis hasilnya di docs/TEST_REPORT.md mengikuti Checklist Penerimaan di PRD.
+     3. Polesan UI: konsistensi spasi dan tipografi, transisi halaman halus,
+     skeleton di semua daftar, fokus keyboard terlihat, teks alt pada gambar,
+     kontras warna, serta halaman 404 dan 500 yang rapi.
+     4. Performa: next/image dengan ukuran tepat, lazy-load, indeks database yang
+     belum ada, paginasi di semua daftar.
+     5. README lengkap: prasyarat, instalasi, import database lewat phpMyAdmin,
+     isi .env, menjalankan frontend dan backend, akun Super Admin awal, cara
+     memuat seed_demo.sql, struktur folder, daftar endpoint ringkas, dan cara
+     cadangan database.
+     6. Pastikan npm run dev, npm run lint, dan npm run build tersedia dan lolos
+     di kedua folder.
+
+
+     Kriteria selesai:
+     - Semua baris Checklist Penerimaan lulus.
+     - Build frontend dan lint di kedua folder lulus tanpa error.
+     - Tidak ada console.log atau kredensial tertinggal di kode.
+
+
+
+  Checklist Penerimaan
+
+     No        Skenario                                 Hasil yang diharapkan
+
+     1         Super Admin login dan menyetujui toko    Pemilik toko bisa login dan masuk
+               baru (SA1, SA2)                          dashboard (AT2)
+
+     2         Admin Toko yang masih pending login      Hanya halaman Menunggu verifikasi;
+                                                        /api/store/* dijawab 403
+
+     3         Super Admin menolak toko tanpa alasan    Ditolak dengan pesan validasi
+
+     4         Super Admin menghapus toko tidak aktif   Toko hilang dari katalog dan tercatat di
+               (SA3)                                    audit log
+
+
+
+
+                                                                                             Page 33 of 34
+PRD dan Skema Prompt — Marketplace Multi-Toko COD
+
+
+
+
+     No        Skenario                                Hasil yang diharapkan
+
+     5         Admin Toko mengunggah produk dengan     Foto keenam ditolak
+               6 foto (AT3.1)
+
+     6         Admin Toko mengurangi stok di bawah     Ditolak dengan pesan jelas
+               jumlah dipesan (AT3.2)
+
+     7         Customer memasukkan barang dari dua     Terbentuk dua pesanan terpisah
+               toko lalu checkout (CU3, CU4)
+
+     8         Dua customer memesan stok terakhir      Satu berhasil, satu mendapat pesan stok
+               bersamaan                               habis
+
+     9         Admin Toko menerima pesanan dan         Customer melihatnya di detail pesanan
+               mengisi lokasi serta jadwal (AT5.1)
+
+     10        Customer dan Admin Toko berchat (CU5)   Pesan sampai real-time di kedua sisi
+
+     11        Admin Toko menekan Konfirmasi lunas     Stok berkurang, jumlah terjual naik,
+               (AT3.3, AT3.4, AT3.5)                   pemasukan tercatat tepat satu kali
+
+     12        Customer menekan Barang diterima lalu   Pesanan selesai dan rating produk
+               memberi ulasan (CU7, X8)                diperbarui
+
+     13        Admin Toko mengunduh Excel untuk satu   Angka sama dengan layar keuangan
+               periode (AT3.6)
+
+     14        Admin Toko A membuka produk atau        Dijawab 404 atau 403
+               pesanan toko B lewat URL
+
+     15        Ubah sandi dan email di setiap peran    Berhasil dengan sandi lama; login ulang
+               (SA4, AT4)                              berjalan
+
+     16        Buka beranda dan dashboard di lebar     Tanpa scroll horizontal; beranda sesuai
+               360, 768, dan 1280 px                   urutan blok referensi
+
+
+
+
+                                                                                              Page 34 of 34
+

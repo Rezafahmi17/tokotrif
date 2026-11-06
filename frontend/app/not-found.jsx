@@ -1,0 +1,2 @@
+import Link from 'next/link';import {SearchX} from 'lucide-react';
+export default function NotFound(){return <div className="container page-space" style={{textAlign:'center'}}><SearchX size={56} color="#94a3b8" style={{margin:'25px auto'}}/><h1 style={{fontSize:30}}>Halaman tidak ditemukan</h1><p className="muted" style={{margin:'12px 0 25px'}}>Alamat halaman mungkin sudah berubah.</p><Link className="btn btn-primary" href="/">Kembali ke beranda</Link></div>;}

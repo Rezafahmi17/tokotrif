@@ -1,0 +1,26 @@
+import express from 'express';import cors from 'cors';import helmet from 'helmet';import cookieParser from 'cookie-parser';import rateLimit from 'express-rate-limit';import path from 'node:path';
+import {env} from './config/env.js';import {db} from './config/db.js';import {wrap,ok} from './utils/common.js';import {authenticate,authorize,storeScope} from './middlewares/auth.js';import {errorHandler} from './middlewares/errorHandler.js';
+import authRoutes from './routes/auth.js';import adminRoutes from './routes/admin.js';import storeRoutes from './routes/store.js';import storeProducts from './routes/storeProducts.js';import storeOrders from './routes/storeOrders.js';import catalogRoutes from './routes/catalog.js';import cartRoutes from './routes/cart.js';import orderRoutes from './routes/orders.js';import chatRoutes from './routes/chat.js';import notificationRoutes from './routes/notifications.js';
+const app=express();app.disable('x-powered-by');app.use(helmet({crossOriginResourcePolicy:{policy:'cross-origin'}}));app.use(cors({origin:env.CLIENT_ORIGIN,credentials:true}));app.use(express.json({limit:'1mb'}));app.use(cookieParser());
+const general=rateLimit({windowMs:15*60*1000,limit:350,standardHeaders:'draft-7',legacyHeaders:false});
+const strict=rateLimit({windowMs:15*60*1000,limit:env.NODE_ENV==='production'?15:150,standardHeaders:'draft-7',legacyHeaders:false,message:{success:false,message:'Terlalu banyak percobaan, coba lagi dalam 15 menit'}});
+app.use('/api',general);app.use('/uploads',express.static(path.resolve(process.cwd(),env.UPLOAD_DIR),{maxAge:'7d'}));
+app.get('/api/health',wrap(async(req,res)=>{await db.query('SELECT 1');ok(res,{database:'connected',service:'marketplace-cod'},'API dan database aktif');}));
+app.use(['/api/auth/login','/api/auth/register','/api/auth/register-store','/api/auth/forgot-password'],strict);
+app.use('/api/auth',authRoutes);
+app.use('/api/catalog',catalogRoutes);
+app.use('/api/admin',authenticate,authorize('super_admin'),adminRoutes);
+app.use('/api/store/products',authenticate,authorize('admin_toko'),storeScope,storeProducts);
+app.use('/api/store/orders',authenticate,authorize('admin_toko'),storeScope,storeOrders);
+app.use('/api/store',authenticate,authorize('admin_toko'),storeScope,storeRoutes);
+app.use('/api/cart',authenticate,authorize('customer'),cartRoutes);
+app.use('/api/orders',authenticate,authorize('customer'),orderRoutes);
+app.use('/api/chat',authenticate,authorize('customer','admin_toko'),chatRoutes);
+app.use('/api/notifications',authenticate,notificationRoutes);
+app.use('/api',(req,res)=>res.status(404).json({success:false,message:'Endpoint tidak ditemukan'}));
+app.use((err,req,res,next)=>{
+ if(err.code==='LIMIT_FILE_SIZE')err={status:422,message:'Ukuran gambar maksimal 2 MB'};
+ if(err.code==='LIMIT_FILE_COUNT')err={status:422,message:'Maksimal 5 foto per produk'};
+ errorHandler(err,req,res,next);
+});
+export default app;
