@@ -6,7 +6,7 @@ const general=rateLimit({windowMs:15*60*1000,limit:350,standardHeaders:'draft-7'
 const strict=rateLimit({windowMs:15*60*1000,limit:env.NODE_ENV==='production'?15:150,standardHeaders:'draft-7',legacyHeaders:false,message:{success:false,message:'Terlalu banyak percobaan, coba lagi dalam 15 menit'}});
 app.use('/api',general);app.use('/uploads',express.static(path.resolve(process.env.VERCEL?'/tmp':process.cwd(),env.UPLOAD_DIR),{maxAge:'7d'}));
 app.get('/',(req,res)=>res.json({success:true,service:'KampusBalik Marketplace COD API',status:'online',health:'/api/health'}));
-app.get('/api/health',wrap(async(req,res)=>{await db.query('SELECT 1');ok(res,{database:'connected',service:'marketplace-cod'},'API dan database aktif');}));
+app.get('/api/health',async(req,res)=>{try{await db.query('SELECT 1');ok(res,{database:'connected',service:'marketplace-cod'},'API dan database aktif');}catch(err){res.status(500).json({success:false,message:'Gagal terhubung ke database',error:err.message,code:err.code});}});
 app.use(['/api/auth/login','/api/auth/register','/api/auth/register-store','/api/auth/forgot-password'],strict);
 app.use('/api/auth',authRoutes);
 app.use('/api/catalog',catalogRoutes);
