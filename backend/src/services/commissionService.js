@@ -3,7 +3,38 @@ import {fail,pageOptions,pagination} from '../utils/common.js';
 import {writeAudit} from '../utils/audit.js';
 import {notify,emitNotification} from './notificationService.js';
 
+let schemaEnsured=false;
+export async function ensureCommissionSchema(){
+ if(schemaEnsured)return;
+ try{
+  await db.query(`
+   CREATE TABLE IF NOT EXISTS store_commissions (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    store_id BIGINT UNSIGNED NOT NULL,
+    order_id BIGINT UNSIGNED NOT NULL UNIQUE,
+    order_code VARCHAR(40) NOT NULL,
+    items_sold INT UNSIGNED NOT NULL DEFAULT 1,
+    commission_per_item DECIMAL(12,2) NOT NULL,
+    total_commission DECIMAL(12,2) NOT NULL,
+    status ENUM('unpaid','waiting_verification','paid','rejected') NOT NULL DEFAULT 'unpaid',
+    proof_url VARCHAR(500) NULL,
+    rejection_reason VARCHAR(500) NULL,
+    paid_at DATETIME NULL,
+    verified_at DATETIME NULL,
+    verified_by BIGINT UNSIGNED NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_comm_store_status(store_id,status)
+   ) ENGINE=InnoDB
+  `);
+  schemaEnsured=true;
+ }catch(e){
+  console.warn('ensureCommissionSchema warning:',e.message);
+ }
+}
+
 export async function getQrisConfig(){
+ await ensureCommissionSchema();
  const data=await rows("SELECT `key`,`value` FROM settings WHERE `key` IN ('commission_per_item','qris_image_url','qris_merchant_name')");
  const map=Object.fromEntries(data.map(r=>[r.key,r.value]));
  return {
@@ -14,6 +45,7 @@ export async function getQrisConfig(){
 }
 
 export async function updateQrisConfig(body){
+ await ensureCommissionSchema();
  if(body.commission_per_item!==undefined){
   const val=Number(body.commission_per_item);
   if(Number.isNaN(val)||val<0)fail(422,'Nominal komisi per barang tidak valid');
@@ -49,6 +81,7 @@ export async function getStoreCommissions(storeId){
 }
 
 export async function submitCommissionPayment(storeId,actor,commissionIds,proofUrl){
+ await ensureCommissionSchema();
  if(!proofUrl)fail(422,'Wajib mengunggah foto bukti pembayaran QRIS');
  const output=await tx(async c=>{
   let targets=[];
@@ -100,17 +133,18 @@ export async function adminListCommissions(q){
   COALESCE(SUM(CASE WHEN status='paid' THEN items_sold ELSE 0 END),0) paid_items_sold
   FROM store_commissions`);
  const delinquentStores=await rows(`SELECT s.id,s.name,s.city,s.status,s.rejection_reason,u.name owner_name,u.email owner_email,
-  COUNT(sc.id) unpaid_count,SUM(sc.total_commission) unpaid_total
+  COUNT(sc.id) unpaid_count,COALESCE(SUM(sc.total_commission),0) unpaid_total
   FROM store_commissions sc
   JOIN stores s ON s.id=sc.store_id
   JOIN users u ON u.id=s.owner_user_id
   WHERE sc.status IN ('unpaid','rejected') AND s.deleted_at IS NULL
-  GROUP BY s.id
+  GROUP BY s.id,s.name,s.city,s.status,s.rejection_reason,u.name,u.email
   ORDER BY unpaid_count DESC,unpaid_total DESC`);
  return {config,totals,delinquentStores,items,pagination:pagination(count.total,p)};
 }
 
 export async function adminVerifyCommission(id,action,actor,reason,ip){
+ await ensureCommissionSchema();
  if(!['approve','reject'].includes(action))fail(404,'Aksi tidak valid');
  if(action==='reject'&&!reason?.trim())fail(422,'Alasan penolakan bukti bayar wajib diisi');
  const output=await tx(async c=>{
@@ -119,7 +153,6 @@ export async function adminVerifyCommission(id,action,actor,reason,ip){
   const store=await one('SELECT * FROM stores WHERE id=? FOR UPDATE',[comm.store_id],c);
   if(action==='approve'){
    await c.query("UPDATE store_commissions SET status='paid',verified_at=NOW(),verified_by=?,rejection_reason=NULL WHERE id=?",[actor,id]);
-   // Catat pengeluaran komisi pada keuangan toko
    const existingExp=await one("SELECT id FROM finance_transactions WHERE store_id=? AND category='Komisi QRIS Super Admin' AND description LIKE ?",[comm.store_id,`%${comm.order_code}%`],c);
    if(!existingExp){
     await c.query(
@@ -127,7 +160,6 @@ export async function adminVerifyCommission(id,action,actor,reason,ip){
      [comm.store_id,comm.total_commission,`Pembayaran Komisi QRIS Pesanan ${comm.order_code} (${comm.items_sold} barang)`,actor]
     );
    }
-   // Periksa sisa tunggakan toko: jika sudah 0 (lunas semua) dan toko sedang suspended, aktifkan kembali toko!
    const rem=await one("SELECT COUNT(*) count FROM store_commissions WHERE store_id=? AND status IN ('unpaid','rejected')",[comm.store_id],c);
    let reactivated=false;
    if(Number(rem?.count||0)===0&&store?.status==='suspended'){
@@ -138,9 +170,9 @@ export async function adminVerifyCommission(id,action,actor,reason,ip){
    const n=await notify(
     store.owner_user_id,
     'commission_verified',
-    reactivated?'Komisi Lunas & Akun Toko Diaktifkan Kembali!':'Pembayaran Komisi QRIS Diterima',
+    reactivated?'Komisi Lunas & Akun Toko Diaktifkan Kembali':'Pembayaran Komisi QRIS Diterima',
     reactivated
-     ?`Seluruh tunggakan komisi Anda telah lunas. Akun toko ${store.name} kini telah aktif kembali dan siap digunakan!`
+     ?`Seluruh tunggakan komisi Anda telah lunas. Akun toko ${store.name} kini telah aktif kembali dan siap digunakan.`
      :`Pembayaran komisi pesanan ${comm.order_code} sebesar Rp ${Number(comm.total_commission).toLocaleString('id-ID')} telah diverifikasi lunas.`,
     '/admin-toko/komisi',
     c
@@ -148,7 +180,6 @@ export async function adminVerifyCommission(id,action,actor,reason,ip){
    return {status:'paid',reactivated,notification:n};
   }else{
    await c.query("UPDATE store_commissions SET status='rejected',rejection_reason=?,verified_at=NOW(),verified_by=? WHERE id=?",[reason.trim(),actor,id]);
-   // Cek apabila setelah ditolak jumlah unpaid/rejected >= 2, kenakan sanksi penangguhan otomatis
    const rem=await one("SELECT COUNT(*) count FROM store_commissions WHERE store_id=? AND status IN ('unpaid','rejected')",[comm.store_id],c);
    if(Number(rem?.count||0)>=2&&store?.status==='approved'){
     const sanctionReason=`Sanksi Otomatis: Menunggak pembayaran komisi QRIS sebanyak ${rem.count} kali penjualan. Harap lunasi seluruh tunggakan komisi via QRIS untuk mengaktifkan kembali akun toko.`;
@@ -164,6 +195,7 @@ export async function adminVerifyCommission(id,action,actor,reason,ip){
 }
 
 export async function adminSanctionStore(storeId,sanctionType,actor,reason,ip){
+ await ensureCommissionSchema();
  if(!['suspend','delete'].includes(sanctionType))fail(422,'Jenis sanksi tidak valid');
  const defaultReason=reason?.trim()||'Sanksi Pelanggaran: Tidak membayar komisi penjualan QRIS kepada Super Admin sebanyak 2 kali atau lebih. Lunasi seluruh tunggakan komisi untuk mengaktifkan kembali akun.';
  const output=await tx(async c=>{

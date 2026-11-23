@@ -41,7 +41,7 @@ export async function sendMessage(user,threadId,body='',type='text',orderId=null
  if(!cleanBody&&!mediaUrl)fail(422,'Pesan atau lampiran foto/video tidak boleh kosong');
  if(cleanBody.length>1000)fail(422,'Pesan maksimal 1000 karakter');
  const resolvedType=mediaType==='video'?'video':mediaType==='image'?'image':(['text','product','image','video'].includes(type)?type:'text');
- const finalBody=cleanBody||(resolvedType==='video'?'🎥 Mengirim video':resolvedType==='image'?'📷 Mengirim foto':'');
+ const finalBody=cleanBody||(resolvedType==='video'?'[Lampiran Video]':resolvedType==='image'?'[Lampiran Foto]':'');
  if(orderId){
   const order=await one('SELECT id FROM orders WHERE id=? AND store_id=? AND customer_id=?',[orderId,t.store_id,t.customer_id]);
   if(!order)fail(403,'Pesanan bukan milik percakapan ini');

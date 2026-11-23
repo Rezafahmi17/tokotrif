@@ -2,11 +2,13 @@ import {db,one,rows,tx} from '../config/db.js';
 import {fail,pageOptions,pagination,uniqSlug} from '../utils/common.js';
 import {writeAudit} from '../utils/audit.js';
 import {notify,emitNotification} from './notificationService.js';
+import {ensureCommissionSchema} from './commissionService.js';
 
 const activitySql='(COALESCE(s.last_active_at,s.created_at)<DATE_SUB(NOW(),INTERVAL ? DAY) AND NOT EXISTS(SELECT 1 FROM orders o WHERE o.store_id=s.id AND o.created_at>=DATE_SUB(NOW(),INTERVAL ? DAY)))';
 async function inactiveDays(){return Number((await one('SELECT `value` FROM settings WHERE `key`=?',['inactive_days']))?.value||30);}
 
 export async function listStores(q){
+ await ensureCommissionSchema();
  const p=pageOptions(q),days=await inactiveDays(),filters=['s.deleted_at IS NULL'],args=[days,days];
  if(q.status){filters.push('s.status=?');args.push(q.status);}
  if(q.q){filters.push('(s.name LIKE ? OR u.email LIKE ? OR u.name LIKE ?)');args.push(`%${q.q}%`,`%${q.q}%`,`%${q.q}%`);}

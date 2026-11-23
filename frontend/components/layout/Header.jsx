@@ -165,11 +165,11 @@ export default function Header(){
       <div className="mobile-only-drawer-links">
        {user?(
         <>
-         <Link href="/pesanan" onClick={()=>setMenu(false)}>📦 Pesanan Saya</Link>
-         {['customer','admin_toko'].includes(user.role)&&<Link href="/chat" onClick={()=>setMenu(false)}>💬 Riwayat Chat {unreadChat>0?`(${unreadChat})`:''}</Link>}
-         <Link href="/akun" onClick={()=>setMenu(false)}>🪪 Akun & Verifikasi KTM ({user.name.split(' ')[0]})</Link>
-         {user.role==='admin_toko'&&<Link href="/admin-toko" onClick={()=>setMenu(false)}>🏪 Dashboard Toko</Link>}
-         {user.role==='super_admin'&&<Link href="/super-admin" onClick={()=>setMenu(false)}>🛡️ Super Admin</Link>}
+         <Link href="/pesanan" onClick={()=>setMenu(false)} style={{display:'flex',alignItems:'center',gap:8}}><Package size={15}/> Pesanan Saya</Link>
+         {['customer','admin_toko'].includes(user.role)&&<Link href="/chat" onClick={()=>setMenu(false)} style={{display:'flex',alignItems:'center',gap:8}}><MessageCircle size={15}/> Riwayat Chat {unreadChat>0?`(${unreadChat})`:''}</Link>}
+         <Link href="/akun" onClick={()=>setMenu(false)} style={{display:'flex',alignItems:'center',gap:8}}><UserRound size={15}/> Akun & Verifikasi KTM ({user.name.split(' ')[0]})</Link>
+         {user.role==='admin_toko'&&<Link href="/admin-toko" onClick={()=>setMenu(false)} style={{display:'flex',alignItems:'center',gap:8}}><Store size={15}/> Dashboard Toko</Link>}
+         {user.role==='super_admin'&&<Link href="/super-admin" onClick={()=>setMenu(false)} style={{display:'flex',alignItems:'center',gap:8}}><ShieldCheck size={15}/> Super Admin</Link>}
          <button className="drawer-logout-btn" onClick={logout}><LogOut size={14}/> Keluar</button>
         </>
        ):(

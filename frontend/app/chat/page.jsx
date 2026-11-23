@@ -120,7 +120,7 @@ export default function Page(){
    sender_id:user.id,
    sender_name:user.name,
    type:currentAttachment?currentAttachment.media_type:'text',
-   body:body||(currentAttachment?.media_type==='video'?'🎥 Mengirim video':currentAttachment?.media_type==='image'?'📷 Mengirim foto':''),
+   body:body||(currentAttachment?.media_type==='video'?'[Lampiran Video]':currentAttachment?.media_type==='image'?'[Lampiran Foto]':''),
    media_url:currentAttachment?.url||null,
    media_type:currentAttachment?.media_type||null,
    created_at:new Date().toISOString()
@@ -296,7 +296,7 @@ export default function Page(){
                <video src={mediaUrl} controls playsInline preload="metadata" className="chat-media-video"/>
               </div>
              )}
-             {m.body&&!(mediaUrl&&(m.body==='📷 Mengirim foto'||m.body==='🎥 Mengirim video'))&&(
+             {m.body&&!(mediaUrl&&(m.body==='[Lampiran Foto]'||m.body==='[Lampiran Video]'||m.body==='📷 Mengirim foto'||m.body==='🎥 Mengirim video'))&&(
               <p>{m.body}</p>
              )}
              <small>{dateID(m.created_at)}</small>
@@ -322,8 +322,8 @@ export default function Page(){
             <img src={imageSrc(attachment.url)} alt="Preview" style={{width:56,height:56,objectFit:'cover',borderRadius:6}}/>
            )}
            <div>
-            <b style={{fontSize:12,color:'#0f172a',display:'block'}}>
-             {attachment.media_type==='video'?'🎥 Video siap dikirim':'📷 Foto siap dikirim'}
+            <b style={{fontSize:12,color:'#0f172a',display:'flex',alignItems:'center',gap:5}}>
+             {attachment.media_type==='video'?<><Video size={14} color="#1669e8"/> Video siap dikirim</>:<><ImageIcon size={14} color="#1669e8"/> Foto siap dikirim</>}
             </b>
             <small className="muted text-xs">{attachment.name}</small>
            </div>

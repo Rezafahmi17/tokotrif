@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useState} from 'react';
-import {Store,Clock,Users,ShoppingBag,Plus,IdCard,Eye,X,Activity,CheckCircle2,XCircle,QrCode,Wallet,AlertTriangle,Upload,ShieldAlert} from 'lucide-react';
+import {Store,Clock,Users,ShoppingBag,Plus,IdCard,Eye,X,Activity,CheckCircle2,XCircle,QrCode,Wallet,AlertTriangle,Upload,ShieldAlert,RefreshCw} from 'lucide-react';
 import DashboardShell from '@/components/layout/DashboardShell';
 import {StatCards,Table,Status} from '@/components/ui/AdminBits';
 import {Button,Pagination} from '@/components/ui/Elements';
@@ -8,15 +8,15 @@ import {useToast} from '@/components/ui/Toast';
 import {api,dateID,imageSrc,rp} from '@/lib/api';
 
 function formatLastActive(minutesAgo,dateStr){
- if(minutesAgo===null||minutesAgo===undefined)return{badge:'Belum tercatat',color:'#64748b',bg:'#f1f5f9',exact:dateID(dateStr)};
+ if(minutesAgo===null||minutesAgo===undefined)return{badge:'Belum tercatat',color:'#64748b',bg:'#f1f5f9',dot:'#94a3b8',exact:dateID(dateStr)};
  const mins=Number(minutesAgo);
- if(mins<=10)return{badge:'🟢 Sedang Aktif (Baru saja)',color:'#15803d',bg:'#dcfce7',exact:dateID(dateStr)};
- if(mins<60)return{badge:`🟢 ${mins} menit yang lalu`,color:'#15803d',bg:'#dcfce7',exact:dateID(dateStr)};
+ if(mins<=10)return{badge:'Sedang Aktif (Baru saja)',color:'#15803d',bg:'#dcfce7',dot:'#16a34a',exact:dateID(dateStr)};
+ if(mins<60)return{badge:`Aktif ${mins} menit lalu`,color:'#15803d',bg:'#dcfce7',dot:'#16a34a',exact:dateID(dateStr)};
  const hours=Math.floor(mins/60);
- if(hours<24)return{badge:`⏱️ ${hours} jam yang lalu`,color:'#1d4ed8',bg:'#dbeafe',exact:dateID(dateStr)};
+ if(hours<24)return{badge:`Aktif ${hours} jam lalu`,color:'#1d4ed8',bg:'#dbeafe',dot:'#2563eb',exact:dateID(dateStr)};
  const days=Math.floor(hours/24);
- if(days<=7)return{badge:`📅 ${days} hari yang lalu`,color:'#b45309',bg:'#fef3c7',exact:dateID(dateStr)};
- return{badge:`⚠️ ${days} hari yang lalu`,color:'#b91c1c',bg:'#fee2e2',exact:dateID(dateStr)};
+ if(days<=7)return{badge:`Aktif ${days} hari lalu`,color:'#b45309',bg:'#fef3c7',dot:'#d97706',exact:dateID(dateStr)};
+ return{badge:`Tidak aktif ${days} hari`,color:'#b91c1c',bg:'#fee2e2',dot:'#dc2626',exact:dateID(dateStr)};
 }
 
 const commStatusBadge={
@@ -32,6 +32,7 @@ export default function SuperPages({kind}){
  const [stores,setStores]=useState(null);
  const [ktmUsers,setKtmUsers]=useState(null);
  const [commData,setCommData]=useState(null);
+ const [commError,setCommError]=useState('');
  const [commConfig,setCommConfig]=useState({commission_per_item:2000,qris_merchant_name:'KampusBalik Official (Super Admin)',qris_image_url:''});
  const [verifTab,setVerifTab]=useState('stores');
  const [cats,setCats]=useState([]);
@@ -57,10 +58,14 @@ export default function SuperPages({kind}){
    }
   }
   if(kind==='commissions'){
+   setCommError('');
    api(`/admin/commissions?status=${status}&q=${encodeURIComponent(q)}`).then(res=>{
     setCommData(res);
     if(res?.config)setCommConfig(res.config);
-   }).catch(e=>show(e.message,'error'));
+   }).catch(e=>{
+    setCommError(e.message||'Gagal memuat data komisi');
+    show(e.message,'error');
+   });
   }
   if(kind==='categories')api('/admin/categories').then(setCats).catch(e=>show(e.message,'error'));
   if(kind==='banners')api('/admin/banners').then(setBanners).catch(e=>show(e.message,'error'));
@@ -125,7 +130,7 @@ export default function SuperPages({kind}){
    fd.append('image',f);
    const res=await api('/admin/commissions/qris-upload',{method:'POST',body:fd});
    setCommConfig(prev=>({...prev,qris_image_url:res.url}));
-   show('Gambar QRIS Super Admin berhasil diperbarui!');
+   show('Gambar QRIS Super Admin berhasil diperbarui');
    load();
   }catch(e){
    show(e.message,'error');
@@ -145,7 +150,7 @@ export default function SuperPages({kind}){
      qris_merchant_name:commConfig.qris_merchant_name
     }
    });
-   show('Tarif komisi per barang & nama merchant QRIS disimpan!');
+   show('Tarif komisi per barang & nama merchant QRIS disimpan');
    load();
   }catch(e){
    show(e.message,'error');
@@ -164,7 +169,7 @@ export default function SuperPages({kind}){
   setBusy(true);
   try{
    const res=await api(`/admin/commissions/${item.id}/${action}`,{method:'PATCH',body});
-   show(res.reactivated?'Komisi disetujui lunas & Akun Toko otomatis diaktifkan kembali!':action==='approve'?'Pembayaran komisi QRIS disetujui lunas':'Bukti pembayaran ditolak');
+   show(res.reactivated?'Komisi disetujui lunas & Akun Toko otomatis diaktifkan kembali':action==='approve'?'Pembayaran komisi QRIS disetujui lunas':'Bukti pembayaran ditolak');
    load();
   }catch(e){
    show(e.message,'error');
@@ -271,7 +276,7 @@ export default function SuperPages({kind}){
           Waktu nyata kapan penjual terakhir kali login, membalas chat, atau mengelola pesanan/produk.
          </p>
         </div>
-        <a className="text-link" href="/super-admin/toko">Lihat semua toko →</a>
+        <a className="text-link" href="/super-admin/toko">Lihat semua toko</a>
        </div>
        <Table
         headers={['Nama Toko','Pemilik','Kota','Status','Kapan Terakhir Aktif']}
@@ -285,7 +290,8 @@ export default function SuperPages({kind}){
            <td>{s.city}</td>
            <td><Status status={s.status}/></td>
            <td>
-            <span style={{display:'inline-block',background:actInfo.bg,color:actInfo.color,fontSize:11,fontWeight:700,padding:'3px 9px',borderRadius:99,marginBottom:3}}>
+            <span style={{display:'inline-flex',alignItems:'center',gap:6,background:actInfo.bg,color:actInfo.color,fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:99,marginBottom:3}}>
+             <span style={{width:7,height:7,borderRadius:'50%',background:actInfo.dot}}/>
              {actInfo.badge}
             </span>
             <br/>
@@ -304,9 +310,15 @@ export default function SuperPages({kind}){
     ):'Memuat statistik...'
    )}
 
-   {/* MENU BARU: KOMISI & QRIS SUPER ADMIN */}
    {kind==='commissions'&&(
-    !commData?'Memuat data komisi & QRIS...':(
+    commError?(
+     <div className="panel" style={{textAlign:'center',padding:36}}>
+      <AlertTriangle size={40} color="#dc2626" style={{margin:'0 auto 12px'}}/>
+      <h3 style={{marginBottom:6}}>Belum Dapat Memuat Data Komisi</h3>
+      <p className="muted text-sm" style={{marginBottom:18}}>{commError}. Pastikan kode backend terbaru sudah ter-deploy di Vercel.</p>
+      <Button onClick={load}><RefreshCw size={15}/> Muat Ulang</Button>
+     </div>
+    ):!commData?'Memuat data komisi & QRIS...':(
      <>
       <StatCards items={[
        ['Pendapatan Komisi (Lunas)',rp(commData.totals?.total_revenue||0),Wallet],
@@ -315,7 +327,6 @@ export default function SuperPages({kind}){
        ['Barang Laku (Komisi Lunas)',`${commData.totals?.paid_items_sold||0} barang`,ShoppingBag]
       ]}/>
 
-      {/* Pengaturan Gambar QRIS Super Admin & Tarif Komisi Per Barang */}
       <div className="form-row" style={{alignItems:'stretch',marginBottom:24}}>
        <div className="panel" style={{textAlign:'center',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
         <span className="badge status-approved" style={{marginBottom:8}}>QRIS PEMBAYARAN KOMISI</span>
@@ -368,14 +379,14 @@ export default function SuperPages({kind}){
          />
          <small className="muted">Contoh: Jika diisi 2000 dan toko menjual 3 barang, maka tagihan komisi toko adalah Rp 6.000.</small>
         </div>
-        <div className="notice" style={{marginBottom:16,fontSize:12}}>
-         ⚖️ <b>Aturan Sanksi Otomatis:</b> Toko yang tidak membayar komisi sebanyak <b>2 kali penjualan</b> otomatis ditangguhkan (<i>Suspended</i>) dan wajib melunasi seluruh tunggakan komisi via QRIS terlebih dahulu untuk mengaktifkan kembali akunnya.
+        <div className="notice" style={{marginBottom:16,fontSize:12,display:'flex',alignItems:'flex-start',gap:8}}>
+         <ShieldAlert size={17} color="#1669e8" style={{flexShrink:0,marginTop:1}}/>
+         <span><b>Aturan Sanksi Otomatis:</b> Toko yang tidak membayar komisi sebanyak <b>2 kali penjualan</b> otomatis ditangguhkan (<i>Suspended</i>) dan wajib melunasi seluruh tunggakan komisi via QRIS terlebih dahulu untuk mengaktifkan kembali akunnya.</span>
         </div>
         <Button loading={busy}>Simpan Tarif Komisi & QRIS</Button>
        </form>
       </div>
 
-      {/* Daftar Toko Menunggak Komisi & Panel Sanksi */}
       {commData.delinquentStores?.length>0&&(
        <div className="panel" style={{marginBottom:24,border:'1.5px solid #fecaca',background:'#fff5f5'}}>
         <h3 style={{color:'#991b1b',display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
@@ -428,7 +439,6 @@ export default function SuperPages({kind}){
        </div>
       )}
 
-      {/* Tabel Semua Tagihan Komisi & Verifikasi Bukti Transfer QRIS */}
       <div className="panel">
        <div className="admin-toolbar" style={{marginBottom:14}}>
         <input className="field" placeholder="Cari nama toko atau kode pesanan..." value={q} onChange={e=>setQ(e.target.value)}/>
@@ -517,11 +527,11 @@ export default function SuperPages({kind}){
     <>
      {kind==='verification'&&(
       <div className="tabs" style={{marginBottom:16}}>
-       <button className={verifTab==='stores'?'active':''} onClick={()=>setVerifTab('stores')}>
-        🏪 Verifikasi Toko & Penjual ({stores?.items?.length||0})
+       <button className={verifTab==='stores'?'active':''} onClick={()=>setVerifTab('stores')} style={{display:'inline-flex',alignItems:'center',gap:6}}>
+        <Store size={15}/> Verifikasi Toko & Penjual ({stores?.items?.length||0})
        </button>
-       <button className={verifTab==='buyers'?'active':''} onClick={()=>setVerifTab('buyers')}>
-        🪪 Verifikasi KTM Pembeli ({ktmUsers?.items?.length||0})
+       <button className={verifTab==='buyers'?'active':''} onClick={()=>setVerifTab('buyers')} style={{display:'inline-flex',alignItems:'center',gap:6}}>
+        <IdCard size={15}/> Verifikasi KTM Pembeli ({ktmUsers?.items?.length||0})
        </button>
       </div>
      )}
@@ -598,7 +608,8 @@ export default function SuperPages({kind}){
              )}
             </td>
             <td>
-             <span style={{display:'inline-block',background:actInfo.bg,color:actInfo.color,fontSize:11,fontWeight:700,padding:'2px 8px',borderRadius:99,marginBottom:2}}>
+             <span style={{display:'inline-flex',alignItems:'center',gap:6,background:actInfo.bg,color:actInfo.color,fontSize:11,fontWeight:700,padding:'2px 9px',borderRadius:99,marginBottom:2}}>
+              <span style={{width:6,height:6,borderRadius:'50%',background:actInfo.dot}}/>
               {actInfo.badge}
              </span>
              <br/>
@@ -797,7 +808,6 @@ export default function SuperPages({kind}){
     </div>
    )}
 
-   {/* Modal Tinjau Verifikasi KTM & Foto Muka Penjual/Pembeli */}
    {inspectModal&&(
     <div className="lightbox-overlay" onClick={()=>setInspectModal(null)}>
      <div className="panel" onClick={e=>e.stopPropagation()} style={{maxWidth:740,width:'95%',maxHeight:'90vh',overflowY:'auto',position:'relative',padding:24}}>

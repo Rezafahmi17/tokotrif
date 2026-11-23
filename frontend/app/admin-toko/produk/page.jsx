@@ -150,8 +150,8 @@ export default function Page(){
            <img src={imageSrc(img.url)} alt="Foto produk" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>{e.target.style.display='none';}}/>
           </div>
           {img.is_primary&&(
-           <span style={{position:'absolute',top:6,left:6,background:'#2563eb',color:'#ffffff',fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:4,boxShadow:'0 2px 4px rgba(0,0,0,0.2)'}}>
-            ★ Sampul
+           <span style={{position:'absolute',top:6,left:6,background:'#2563eb',color:'#ffffff',fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:4,boxShadow:'0 2px 4px rgba(0,0,0,0.2)',display:'inline-flex',alignItems:'center',gap:3}}>
+            <Star size={10} fill="currentColor"/> Sampul
            </span>
           )}
           <div style={{padding:'6px 4px',display:'flex',justifyContent:'space-between',alignItems:'center',background:'#f1f5f9',gap:4}}>
@@ -186,8 +186,9 @@ export default function Page(){
   )}
   {!data?'Memuat...':(
    <>
-    <div className="notice" style={{marginBottom:14,fontSize:12}}>
-     💡 <b>Catatan Sistem Stok:</b> Stok produk <b>tidak akan berkurang</b> saat pembeli baru membuat pesanan (status <i>Menunggu Toko</i>). Stok hanya dikunci setelah Anda menekan <b>Terima & Sepakati COD</b>, dan resmi terpotong saat pesanan <b>Lunas</b>.
+    <div className="notice" style={{marginBottom:14,fontSize:12,display:'flex',alignItems:'center',gap:8}}>
+     <AlertCircle size={16} color="#1669e8" style={{flexShrink:0}}/>
+     <span><b>Catatan Sistem Stok:</b> Stok produk <b>tidak akan berkurang</b> saat pembeli baru membuat pesanan (status <i>Menunggu Toko</i>). Stok hanya dikunci setelah Anda menekan <b>Terima & Sepakati COD</b>, dan resmi terpotong saat pesanan <b>Lunas</b>.</span>
     </div>
     <Table headers={['Nama produk','Harga','Stok Tersedia','Terkonfirmasi COD','Status','Aksi']} items={data.items} render={p=>(
      <>

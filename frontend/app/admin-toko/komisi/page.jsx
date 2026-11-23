@@ -98,13 +98,13 @@ export default function Page(){
       <ShieldAlert size={32} color="#dc2626" style={{flexShrink:0,marginTop:2}}/>
       <div>
        <h3 style={{margin:0,color:'#991b1b',fontSize:17}}>
-        ⚠️ AKUN TOKO ANDA SEDANG DITANGGUHKAN (SANKSI KOMISI)
+        AKUN TOKO ANDA SEDANG DITANGGUHKAN (SANKSI KOMISI)
        </h3>
        <p style={{margin:'6px 0 10px',color:'#7f1d1d',fontSize:13,lineHeight:1.55}}>
         {data?.store?.rejection_reason||'Toko Anda tidak membayar komisi penjualan sebanyak 2 kali atau lebih.'}
        </p>
        <div style={{background:'#ffffff',padding:'10px 14px',borderRadius:8,border:'1px solid #fecaca',fontSize:12.5,color:'#991b1b',fontWeight:600}}>
-        💡 Cara Mengaktifkan Kembali Akun Toko: Scan kode QRIS Super Admin di bawah ini, bayar seluruh tunggakan komisi sebesar <b>{rp(data?.summary?.unpaid_amount||0)}</b>, lalu unggah bukti pembayarannya. Setelah diverifikasi lunas oleh Super Admin, akun toko Anda akan <b>otomatis aktif kembali</b>!
+        Cara Mengaktifkan Kembali Akun Toko: Scan kode QRIS Super Admin di bawah ini, bayar seluruh tunggakan komisi sebesar <b>{rp(data?.summary?.unpaid_amount||0)}</b>, lalu unggah bukti pembayarannya. Setelah diverifikasi lunas oleh Super Admin, akun toko Anda akan <b>otomatis aktif kembali</b>.
        </div>
       </div>
      </div>
@@ -112,8 +112,9 @@ export default function Page(){
    )}
 
    {!isSuspended&&unpaidCount===1&&(
-    <div className="notice notice-warning" style={{marginBottom:20,borderLeft:'4px solid #d97706'}}>
-     <b>⚠️ Peringatan Tunggakan Komisi (1/2):</b> Anda memiliki <b>1 tagihan komisi</b> yang belum dibayar. Harap segera lunasi via QRIS di bawah ini. Jika mencapai <b>2 kali tidak membayar komisi</b>, akun toko akan otomatis dikenakan <b>sanksi penangguhan atau penghapusan akun</b>.
+    <div className="notice notice-warning" style={{marginBottom:20,borderLeft:'4px solid #d97706',display:'flex',alignItems:'center',gap:10}}>
+     <AlertTriangle size={18} color="#d97706" style={{flexShrink:0}}/>
+     <span><b>Peringatan Tunggakan Komisi (1/2):</b> Anda memiliki <b>1 tagihan komisi</b> yang belum dibayar. Harap segera lunasi via QRIS di bawah ini. Jika mencapai <b>2 kali tidak membayar komisi</b>, akun toko akan otomatis dikenakan <b>sanksi penangguhan atau penghapusan akun</b>.</span>
     </div>
    )}
 
@@ -208,7 +209,7 @@ export default function Page(){
            <div style={{marginTop:10,display:'flex',alignItems:'center',gap:12,background:'#f0fdf4',padding:10,borderRadius:8,border:'1px solid #bbf7d0'}}>
             <img src={imageSrc(proofUrl)} alt="Bukti QRIS" style={{width:56,height:56,objectFit:'cover',borderRadius:6,cursor:'pointer'}} onClick={()=>setPreviewModal(imageSrc(proofUrl))}/>
             <div>
-             <b style={{fontSize:12,color:'#15803d',display:'block'}}>✓ Bukti transfer siap dikirim</b>
+             <b style={{fontSize:12,color:'#15803d',display:'flex',alignItems:'center',gap:4}}><CheckCircle2 size={14}/> Bukti transfer siap dikirim</b>
              <small className="muted text-xs">Klik tombol di bawah untuk mengirim ke Super Admin</small>
             </div>
            </div>
