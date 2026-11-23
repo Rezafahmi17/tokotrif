@@ -23,7 +23,7 @@ export default function Footer(){
      <Link href="/cari">Semua produk</Link>
      <Link href="/cari?sort=bestseller">Paling laris</Link>
      <Link href="/cari?sort=price_asc">Promo hemat</Link>
-     <Link href="/#toko-pilihan">Toko pilihan</Link>
+     <Link href="/chat">Riwayat chat</Link>
     </div>
     <div>
      <h4>Untuk Penjual</h4>
