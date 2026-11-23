@@ -74,20 +74,55 @@ export async function paid(storeId,id,actor){
  const result=await tx(async c=>{
   const o=await one('SELECT * FROM orders WHERE id=? AND store_id=? FOR UPDATE',[id,storeId],c);if(!o)fail(404,'Pesanan tidak ditemukan');assertTransition(o.status,'paid','admin_toko');
   const items=await rows('SELECT * FROM order_items WHERE order_id=? ORDER BY product_id',[id],c);
+  let totalItemsSold=0;
   for(const it of items){
    const p=await one('SELECT id,stock,reserved FROM products WHERE id=? FOR UPDATE',[it.product_id],c);
    if(!p||p.stock<it.qty)fail(409,'Stok produk tidak mencukupi untuk menyelesaikan pembayaran');
    const nextReserved=Math.max(0,p.reserved-it.qty);
    await c.query('UPDATE products SET stock=stock-?,reserved=?,sold_count=sold_count+? WHERE id=?',[it.qty,nextReserved,it.qty,it.product_id]);
    await c.query('INSERT INTO stock_movements(product_id,store_id,type,qty,balance_after,note,order_id,created_by) VALUES(?,?,?,?,?,?,?,?)',[it.product_id,storeId,'penjualan',-it.qty,p.stock-it.qty,`Pembayaran ${o.code}`,id,actor]);
+   totalItemsSold+=Number(it.qty);
   }
   await c.query('INSERT INTO finance_transactions(store_id,type,category,amount,description,trx_date,order_id,created_by) VALUES(?,?,?,?,?,CURDATE(),?,?)',[storeId,'income','Penjualan COD',o.total,`Pembayaran ${o.code}`,id,actor]);
   await c.query('UPDATE orders SET status=?,paid_at=NOW() WHERE id=?',['paid',id]);
   await history(c,id,'confirmed','paid',actor,'Uang tunai diterima dan stok resmi terjual');
   await c.query('UPDATE stores SET last_active_at=NOW() WHERE id=?',[storeId]);
+
+  // Hitung komisi Super Admin per barang yang laku terjual
+  const commSetting=await one("SELECT `value` FROM settings WHERE `key`='commission_per_item'",[],c);
+  const commPerItem=Number(commSetting?.value||2000);
+  const totalComm=Math.max(0,totalItemsSold*commPerItem);
+  if(totalComm>0){
+   await c.query(
+    'INSERT INTO store_commissions(store_id,order_id,order_code,items_sold,commission_per_item,total_commission,status) VALUES(?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE items_sold=VALUES(items_sold),total_commission=VALUES(total_commission)',
+    [storeId,id,o.code,totalItemsSold,commPerItem,totalComm,'unpaid']
+   );
+  }
+
+  // Cek apakah toko sudah tidak membayar komisi sebanyak 2 kali (status unpaid / rejected >= 2)
+  const unpaidRow=await one("SELECT COUNT(*) count FROM store_commissions WHERE store_id=? AND status IN ('unpaid','rejected')",[storeId],c);
+  const unpaidCount=Number(unpaidRow?.count||0);
+  let storeSuspendedNow=false;
+  const storeInfo=await one('SELECT owner_user_id,name,status FROM stores WHERE id=?',[storeId],c);
+
+  if(unpaidCount>=2&&storeInfo?.status==='approved'){
+   const sanctionReason=`Sanksi Otomatis: Menunggak pembayaran komisi QRIS Super Admin sebanyak ${unpaidCount} kali transaksi penjualan. Silakan bayar dan lunasi seluruh tunggakan komisi via QRIS untuk mengaktifkan kembali akun toko Anda.`;
+   await c.query("UPDATE stores SET status='suspended',rejection_reason=? WHERE id=?",[sanctionReason,storeId]);
+   storeSuspendedNow=true;
+  }
+
   const notification=await notify(o.customer_id,'order_paid','Pembayaran dikonfirmasi',`Pesanan ${o.code} sudah lunas`,`/pesanan/${o.code}`,c);
-  return {status:'paid',notification};
- });emitNotification(result.notification);return {status:result.status};
+  let sellerNotif=null;
+  if(storeSuspendedNow&&storeInfo){
+   sellerNotif=await notify(storeInfo.owner_user_id,'store_sanction','Sanksi Penangguhan Toko (2x Komisi Belum Dibayar)',`Toko Anda ditangguhkan otomatis karena belum membayar komisi QRIS sebanyak ${unpaidCount} kali. Lunasi segera di menu Komisi QRIS untuk mengaktifkan kembali toko.`,'/admin-toko/komisi',c);
+  }else if(totalComm>0&&storeInfo){
+   sellerNotif=await notify(storeInfo.owner_user_id,'commission_bill',`Tagihan Komisi QRIS (${o.code})`,`Komisi penjualan ${totalItemsSold} barang sebesar Rp ${totalComm.toLocaleString('id-ID')}. Segera bayar via QRIS agar tidak terkena sanksi.`,'/admin-toko/komisi',c);
+  }
+  return {status:'paid',notification,sellerNotif,storeSuspendedNow};
+ });
+ emitNotification(result.notification);
+ if(result.sellerNotif)emitNotification(result.sellerNotif);
+ return {status:result.status,storeSuspended:result.storeSuspendedNow};
 }
 
 export async function cancel(id,role,actor,reason,storeId=null){

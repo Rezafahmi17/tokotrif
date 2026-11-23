@@ -19,7 +19,9 @@ export async function listStores(q){
   u.name owner_name,u.email owner_email,u.phone owner_phone,u.nim owner_nim,u.ktm_status owner_ktm_status,
   ${activitySql} AS isInactive,
   (SELECT COUNT(*) FROM products p WHERE p.store_id=s.id AND p.deleted_at IS NULL) product_count,
-  (SELECT COUNT(*) FROM orders o WHERE o.store_id=s.id) order_count
+  (SELECT COUNT(*) FROM orders o WHERE o.store_id=s.id) order_count,
+  (SELECT COUNT(*) FROM store_commissions sc WHERE sc.store_id=s.id AND sc.status IN ('unpaid','rejected')) unpaid_commissions_count,
+  (SELECT COALESCE(SUM(sc.total_commission),0) FROM store_commissions sc WHERE sc.store_id=s.id AND sc.status IN ('unpaid','rejected')) unpaid_commissions_amount
   FROM stores s JOIN users u ON u.id=s.owner_user_id WHERE ${where}
   ORDER BY FIELD(s.status,'pending','approved','rejected','suspended'),COALESCE(s.last_active_at,s.created_at) DESC LIMIT ? OFFSET ?`,[...args,p.limit,p.offset]);
  const count=await one(`SELECT COUNT(*) total FROM stores s JOIN users u ON u.id=s.owner_user_id WHERE ${where}`,args.slice(2));
@@ -79,6 +81,12 @@ export async function transitionStore(id,action,actor,reason,ip){
   const s=await one('SELECT * FROM stores WHERE id=? AND deleted_at IS NULL FOR UPDATE',[id],c);
   if(!s)fail(404,'Toko tidak ditemukan');
   if(!allowed[action].includes(s.status))fail(409,'Perubahan status toko tidak diperbolehkan');
+  if(['reactivate','approve'].includes(action)&&s.status==='suspended'){
+   const unpaid=await one("SELECT COUNT(*) count,COALESCE(SUM(total_commission),0) total FROM store_commissions WHERE store_id=? AND status IN ('unpaid','rejected')",[id],c);
+   if(Number(unpaid?.count||0)>0){
+    fail(409,`Toko masih memiliki ${unpaid.count} tunggakan komisi QRIS sebesar Rp ${Number(unpaid.total).toLocaleString('id-ID')}. Toko wajib membayar dan melunasi komisi terlebih dahulu sebelum akun dapat diaktifkan kembali.`);
+   }
+  }
   const to={approve:'approved',reject:'rejected',suspend:'suspended',reactivate:'approved'}[action];
   await c.query('UPDATE stores SET status=?,rejection_reason=?,verified_by=?,verified_at=NOW() WHERE id=?',[to,reason||null,actor,id]);
   if(to==='approved'){

@@ -173,7 +173,6 @@ app.use(
   "/api/store",
   authenticate,
   authorize("admin_toko"),
-  storeScope,
   storeRoutes,
 );
 app.use("/api/cart", authenticate, authorize("customer"), cartRoutes);

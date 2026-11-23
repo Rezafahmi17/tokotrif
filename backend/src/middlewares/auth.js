@@ -29,12 +29,19 @@ export const authorize=(...roles)=>(req,res,next)=>{
  return next(new ErrorWithStatus(403,'Akses ditolak untuk peran ini'));
 };
 class ErrorWithStatus extends Error{constructor(status,message){super(message);this.status=status;}}
+
+export const storeScopeAllowSuspended=wrap(async(req,res,next)=>{
+ const store=await one('SELECT * FROM stores WHERE owner_user_id=? AND deleted_at IS NULL',[req.user.id]);
+ if(!store)fail(403,'Akun tidak memiliki toko. Silakan buat toko terlebih dahulu.');
+ req.store=store;next();
+});
+
 export const storeScope=wrap(async(req,res,next)=>{
  const store=await one('SELECT * FROM stores WHERE owner_user_id=? AND deleted_at IS NULL',[req.user.id]);
  if(!store)fail(403,'Akun tidak memiliki toko. Silakan buat toko terlebih dahulu.');
  if(store.status==='pending')fail(403,'Toko Anda sedang menunggu verifikasi KTM & Identitas oleh Super Admin. Anda dapat mulai mengelola produk setelah toko disetujui.');
  if(store.status==='rejected')fail(403,`Pendaftaran toko ditolak: ${store.rejection_reason||'Tidak memenuhi kriteria'}`);
- if(store.status==='suspended')fail(403,`Toko sedang ditangguhkan: ${store.rejection_reason||'Silakan hubungi admin'}`);
+ if(store.status==='suspended')fail(403,`Akun toko ditangguhkan: ${store.rejection_reason||'Silakan lunasi seluruh tunggakan komisi QRIS kepada Super Admin terlebih dahulu agar akun toko dapat aktif kembali.'}`);
  if(store.status!=='approved')fail(403,`Toko belum dapat digunakan (status: ${store.status})`);
  req.store=store;next();
 });

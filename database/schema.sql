@@ -152,3 +152,23 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 CREATE TABLE IF NOT EXISTS settings (
  `key` VARCHAR(100) PRIMARY KEY,`value` VARCHAR(500) NOT NULL
 ) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS store_commissions (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ store_id BIGINT UNSIGNED NOT NULL,
+ order_id BIGINT UNSIGNED NOT NULL UNIQUE,
+ order_code VARCHAR(40) NOT NULL,
+ items_sold INT UNSIGNED NOT NULL DEFAULT 1,
+ commission_per_item DECIMAL(12,2) NOT NULL,
+ total_commission DECIMAL(12,2) NOT NULL,
+ status ENUM('unpaid','waiting_verification','paid','rejected') NOT NULL DEFAULT 'unpaid',
+ proof_url VARCHAR(500) NULL,
+ rejection_reason VARCHAR(500) NULL,
+ paid_at DATETIME NULL,
+ verified_at DATETIME NULL,
+ verified_by BIGINT UNSIGNED NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ FOREIGN KEY(store_id) REFERENCES stores(id) ON DELETE RESTRICT,
+ FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE RESTRICT,
+ INDEX idx_comm_store_status(store_id,status)
+) ENGINE=InnoDB;
