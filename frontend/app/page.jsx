@@ -70,13 +70,6 @@ export default function Home(){
       <Link href={banner?.cta_link||'/cari'} className="btn btn-amber">{banner?.cta_label||'Mulai belanja'} <ArrowUpRight size={17}/></Link>
       <Link href="/daftar-toko" className="btn btn-hero-outline">Buka toko mahasiswa <ArrowRight size={17}/></Link>
      </div>
-     <div className="hero-social">
-      <img src="/logo.png" alt="KampusBalik" className="hero-avatar-logo"/>
-      <div>
-       <b>Terproteksi Verifikasi KTM Mahasiswa</b>
-       <small>Keamanan ekstra untuk pembeli & penjual di lingkungan kampus</small>
-      </div>
-     </div>
      <div className="hero-geometry"><ShoppingBag size={148} strokeWidth={0.8}/></div>
      {heroes.length>1&&(
       <div className="hero-controls">
@@ -177,25 +170,6 @@ export default function Home(){
    </section>
 
    <ProductSection title="Produk paling diminati" subtitle="Pilihan populer berdasarkan jumlah barang terjual." items={data.bestsellers} link="/cari?sort=bestseller"/>
-
-   <section className="trust-block">
-    <div>
-     <span className="light-eyebrow">DIBUAT UNTUK KOMUNITAS KAMPUS & SEKITARNYA</span>
-     <h2>Belanja lebih dekat,<br/>bertransaksi lebih yakin.</h2>
-     <p>Marketplace eksklusif dengan sistem verifikasi Kartu Tanda Mahasiswa (KTM) dan foto identitas untuk mempertemukan penjual dan pembeli secara aman, langsung, dan transparan.</p>
-     <Link href="/daftar-toko" className="btn btn-amber">Gabung sebagai penjual <ArrowUpRight size={17}/></Link>
-    </div>
-    <div className="trust-metrics">
-     <div>
-      <strong>{data.stats.completed_orders}</strong>
-      <span>Pesanan selesai</span>
-     </div>
-     <div>
-      <strong>{Number(data.stats.avg_rating).toFixed(1)} <Star size={22} fill="currentColor"/></strong>
-      <span>Rata-rata ulasan</span>
-     </div>
-    </div>
-   </section>
   </div>
  );
 }
