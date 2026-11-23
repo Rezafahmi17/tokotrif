@@ -186,11 +186,14 @@ export default function Page(){
   )}
   {!data?'Memuat...':(
    <>
-    <Table headers={['Nama produk','Harga','Stok','Dipesan','Status','Aksi']} items={data.items} render={p=>(
+    <div className="notice" style={{marginBottom:14,fontSize:12}}>
+     💡 <b>Catatan Sistem Stok:</b> Stok produk <b>tidak akan berkurang</b> saat pembeli baru membuat pesanan (status <i>Menunggu Toko</i>). Stok hanya dikunci setelah Anda menekan <b>Terima & Sepakati COD</b>, dan resmi terpotong saat pesanan <b>Lunas</b>.
+    </div>
+    <Table headers={['Nama produk','Harga','Stok Tersedia','Terkonfirmasi COD','Status','Aksi']} items={data.items} render={p=>(
      <>
       <td><b>{p.name}</b><br/><small>{p.category_name}</small></td>
       <td>{rp(p.price)}</td>
-      <td>{p.stock}</td>
+      <td><b>{Math.max(0,p.stock-p.reserved)}</b> <small className="muted">(Total: {p.stock})</small></td>
       <td>{p.reserved}</td>
       <td><Status status={p.status}/></td>
       <td>

@@ -2,28 +2,75 @@ import {db,one,rows,tx} from '../config/db.js';
 import {fail,pageOptions,pagination,uniqSlug} from '../utils/common.js';
 import {writeAudit} from '../utils/audit.js';
 import {notify,emitNotification} from './notificationService.js';
+
 const activitySql='(COALESCE(s.last_active_at,s.created_at)<DATE_SUB(NOW(),INTERVAL ? DAY) AND NOT EXISTS(SELECT 1 FROM orders o WHERE o.store_id=s.id AND o.created_at>=DATE_SUB(NOW(),INTERVAL ? DAY)))';
 async function inactiveDays(){return Number((await one('SELECT `value` FROM settings WHERE `key`=?',['inactive_days']))?.value||30);}
+
 export async function listStores(q){
  const p=pageOptions(q),days=await inactiveDays(),filters=['s.deleted_at IS NULL'],args=[days,days];
  if(q.status){filters.push('s.status=?');args.push(q.status);}
- if(q.q){filters.push('(s.name LIKE ? OR u.email LIKE ?)');args.push(`%${q.q}%`,`%${q.q}%`);}
+ if(q.q){filters.push('(s.name LIKE ? OR u.email LIKE ? OR u.name LIKE ?)');args.push(`%${q.q}%`,`%${q.q}%`,`%${q.q}%`);}
  const where=filters.join(' AND ');
- const data=await rows(`SELECT s.*,u.name owner_name,u.email owner_email,${activitySql} AS isInactive,
- (SELECT COUNT(*) FROM products p WHERE p.store_id=s.id AND p.deleted_at IS NULL) product_count,
- (SELECT COUNT(*) FROM orders o WHERE o.store_id=s.id) order_count
- FROM stores s JOIN users u ON u.id=s.owner_user_id WHERE ${where} ORDER BY FIELD(s.status,'pending','approved','rejected','suspended'),s.created_at DESC LIMIT ? OFFSET ?`,[...args,p.limit,p.offset]);
+ const data=await rows(`SELECT s.*,
+  COALESCE(s.ktm_url, u.ktm_url) AS ktm_url,
+  COALESCE(s.face_url, u.face_url) AS face_url,
+  COALESCE(s.last_active_at, u.last_login_at, s.created_at) AS last_active_at,
+  TIMESTAMPDIFF(MINUTE, COALESCE(s.last_active_at, u.last_login_at, s.created_at), NOW()) AS minutes_ago,
+  u.name owner_name,u.email owner_email,u.phone owner_phone,u.nim owner_nim,u.ktm_status owner_ktm_status,
+  ${activitySql} AS isInactive,
+  (SELECT COUNT(*) FROM products p WHERE p.store_id=s.id AND p.deleted_at IS NULL) product_count,
+  (SELECT COUNT(*) FROM orders o WHERE o.store_id=s.id) order_count
+  FROM stores s JOIN users u ON u.id=s.owner_user_id WHERE ${where}
+  ORDER BY FIELD(s.status,'pending','approved','rejected','suspended'),COALESCE(s.last_active_at,s.created_at) DESC LIMIT ? OFFSET ?`,[...args,p.limit,p.offset]);
  const count=await one(`SELECT COUNT(*) total FROM stores s JOIN users u ON u.id=s.owner_user_id WHERE ${where}`,args.slice(2));
  return {items:data,pagination:pagination(count.total,p)};
 }
+
+export async function listCustomerKtm(q){
+ const p=pageOptions(q),filters=["u.role='customer'","u.deleted_at IS NULL"],args=[];
+ if(q.status){filters.push('u.ktm_status=?');args.push(q.status);}
+ else{filters.push("u.ktm_status IN ('pending','verified','rejected')");}
+ if(q.q){filters.push('(u.name LIKE ? OR u.email LIKE ? OR u.nim LIKE ?)');args.push(`%${q.q}%`,`%${q.q}%`,`%${q.q}%`);}
+ const where=filters.join(' AND ');
+ const items=await rows(`SELECT u.id,u.name,u.email,u.phone,u.nim,u.ktm_url,u.face_url,u.ktm_status,u.ktm_rejection_reason,u.last_login_at,u.created_at
+  FROM users u WHERE ${where}
+  ORDER BY FIELD(u.ktm_status,'pending','verified','rejected','unsubmitted'),u.created_at DESC LIMIT ? OFFSET ?`,[...args,p.limit,p.offset]);
+ const count=await one(`SELECT COUNT(*) total FROM users u WHERE ${where}`,args);
+ return {items,pagination:pagination(count.total,p)};
+}
+
+export async function verifyCustomerKtm(userId,action,actor,reason,ip){
+ if(!['approve','reject'].includes(action))fail(404,'Aksi tidak valid');
+ if(action==='reject'&&!reason?.trim())fail(422,'Alasan penolakan KTM wajib diisi');
+ const to=action==='approve'?'verified':'rejected';
+ const output=await tx(async c=>{
+  const u=await one('SELECT * FROM users WHERE id=? AND deleted_at IS NULL FOR UPDATE',[userId],c);
+  if(!u)fail(404,'Pengguna tidak ditemukan');
+  await c.query('UPDATE users SET ktm_status=?,ktm_rejection_reason=? WHERE id=?',[to,action==='reject'?reason.trim():null,userId]);
+  await writeAudit(actor,`user.ktm_${action}`,'user',userId,{from:u.ktm_status,to,reason},ip,c);
+  const n=await notify(userId,'ktm_status',action==='approve'?'KTM Mahasiswa Terverifikasi':'Verifikasi KTM Ditolak',action==='approve'?'Selamat! KTM Mahasiswa Anda telah diverifikasi oleh Super Admin.':`Alasan: ${reason}`,'/akun',c);
+  return {status:to,notification:n};
+ });
+ emitNotification(output.notification);
+ return {status:output.status};
+}
+
 export async function stats(){
  const count=await rows('SELECT status,COUNT(*) count FROM stores WHERE deleted_at IS NULL GROUP BY status');
  const days=await inactiveDays();
  const inactive=await one(`SELECT COUNT(*) count FROM stores s WHERE s.deleted_at IS NULL AND ${activitySql}`,[days,days]);
  const orders=await one('SELECT COUNT(*) total,COALESCE(SUM(status=? AND created_at>=DATE_SUB(NOW(),INTERVAL 30 DAY)),0) completed_30d FROM orders',['completed']);
  const customer=await one('SELECT COUNT(*) count FROM users WHERE role=? AND status=?',['customer','active']);
- return {stores:count,inactive:inactive.count,orders:orders.total,completed30d:orders.completed_30d,customers:customer.count};
+ const pendingKtm=await one("SELECT COUNT(*) count FROM users WHERE role='customer' AND ktm_status='pending' AND deleted_at IS NULL");
+ const recentStores=await rows(`SELECT s.id,s.name,s.city,s.status,
+  COALESCE(s.last_active_at, u.last_login_at, s.created_at) AS last_active_at,
+  TIMESTAMPDIFF(MINUTE, COALESCE(s.last_active_at, u.last_login_at, s.created_at), NOW()) AS minutes_ago,
+  u.name owner_name,u.email owner_email
+  FROM stores s JOIN users u ON u.id=s.owner_user_id WHERE s.deleted_at IS NULL
+  ORDER BY COALESCE(s.last_active_at, u.last_login_at, s.created_at) DESC LIMIT 8`);
+ return {stores:count,inactive:inactive.count,orders:orders.total,completed30d:orders.completed_30d,customers:customer.count,pendingKtmBuyers:pendingKtm?.count||0,recentStores};
 }
+
 export async function transitionStore(id,action,actor,reason,ip){
  const allowed={approve:['pending','rejected','suspended'],reject:['pending'],suspend:['approved'],reactivate:['suspended']};
  if(!allowed[action])fail(404,'Aksi tidak tersedia');
@@ -34,11 +81,17 @@ export async function transitionStore(id,action,actor,reason,ip){
   if(!allowed[action].includes(s.status))fail(409,'Perubahan status toko tidak diperbolehkan');
   const to={approve:'approved',reject:'rejected',suspend:'suspended',reactivate:'approved'}[action];
   await c.query('UPDATE stores SET status=?,rejection_reason=?,verified_by=?,verified_at=NOW() WHERE id=?',[to,reason||null,actor,id]);
+  if(to==='approved'){
+   await c.query("UPDATE users SET ktm_status='verified',ktm_rejection_reason=NULL WHERE id=?",[s.owner_user_id]);
+  }else if(to==='rejected'){
+   await c.query("UPDATE users SET ktm_status='rejected',ktm_rejection_reason=? WHERE id=?",[reason||null,s.owner_user_id]);
+  }
   await writeAudit(actor,`store.${action}`,'store',id,{from:s.status,to,reason},ip,c);
   const n=await notify(s.owner_user_id,'store_status',`Status toko: ${to}`,reason||'Status toko telah diperbarui','/admin-toko',c);
   return {status:to,notification:n};
  });emitNotification(output.notification);return {status:output.status};
 }
+
 export async function deleteStore(id,actor,reason,confirm,ip){
  if(confirm!==true||!reason?.trim())fail(422,'Konfirmasi dan alasan wajib diisi');
  await tx(async c=>{
@@ -52,6 +105,7 @@ export async function deleteStore(id,actor,reason,confirm,ip){
   await writeAudit(actor,'store.delete','store',id,{reason},ip,c);
  });
 }
+
 export async function getCategories(){return rows('SELECT c.*,p.name parent_name FROM categories c LEFT JOIN categories p ON p.id=c.parent_id ORDER BY c.sort_order,c.name');}
 export async function saveCategory(body,id){
  if(body.parent_id){const parent=await one('SELECT * FROM categories WHERE id=?',[body.parent_id]);if(!parent||parent.parent_id||Number(body.parent_id)===Number(id))fail(422,'Kategori induk hanya boleh satu tingkat');}

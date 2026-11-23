@@ -5,16 +5,31 @@ import {env} from '../config/env.js';
 import {wrap,ok} from '../utils/common.js';
 import {validate} from '../middlewares/validate.js';
 import {authenticate,cookieName,cookieOpts} from '../middlewares/auth.js';
+import {upload,saveImage} from '../utils/upload.js';
 import * as service from '../services/authService.js';
+
 const r=Router();
+
+r.post('/upload-doc',upload.single('file'),wrap(async(req,res)=>{
+ const url=await saveImage(req.file);
+ ok(res,{url},'Dokumen berhasil diunggah',201);
+}));
+
 r.post('/register',validate(service.regSchema),wrap(async(req,res)=>ok(res,await service.register(req.body),'Akun berhasil dibuat',201)));
 r.post('/register-store',validate(service.regStoreSchema),wrap(async(req,res)=>ok(res,await service.register(req.body,true),'Pendaftaran toko berhasil dan sedang menunggu verifikasi super admin',201)));
+
 r.post('/open-store',authenticate,validate(service.openStoreSchema),wrap(async(req,res)=>{
  const result=await service.openStore(req.user.id,req.body);
  const token=jwt.sign({sub:req.user.id,role:'admin_toko'},env.JWT_SECRET,{expiresIn:'7d'});
  res.cookie(cookieName,token,cookieOpts);
  ok(res,{...result,token},'Pendaftaran toko berhasil dan sedang menunggu verifikasi super admin',201);
 }));
+
+r.patch('/verification',authenticate,validate(service.verificationSchema),wrap(async(req,res)=>{
+ const updated=await service.updateVerification(req.user.id,req.body);
+ ok(res,updated,'Data verifikasi berhasil disimpan');
+}));
+
 r.post('/login',validate(service.loginSchema),wrap(async(req,res)=>{
  const token=await service.login(req.body);
  const payload=jwt.verify(token,env.JWT_SECRET);
@@ -22,10 +37,12 @@ r.post('/login',validate(service.loginSchema),wrap(async(req,res)=>{
  res.cookie(cookieName,token,cookieOpts);
  ok(res,{token,user},'Berhasil masuk');
 }));
+
 r.post('/logout',(req,res)=>{res.clearCookie(cookieName,{...cookieOpts,maxAge:undefined});ok(res,null,'Berhasil keluar');});
 r.get('/me',authenticate,wrap(async(req,res)=>ok(res,await service.profile(req.user.id))));
 r.patch('/password',authenticate,validate(service.credentialsSchema),wrap(async(req,res)=>{await service.updatePassword(req.user.id,req.body);ok(res,null,'Sandi berhasil diubah');}));
 r.patch('/email',authenticate,validate(service.emailSchema),wrap(async(req,res)=>{await service.updateEmail(req.user.id,req.body);ok(res,null,'Email berhasil diubah');}));
 r.post('/forgot-password',validate(z.object({email:z.string().email()})),wrap(async(req,res)=>{await service.forgot(req.body.email);ok(res,null,'Jika email terdaftar, instruksi reset akan dikirim');}));
 r.post('/reset-password',validate(z.object({token:z.string().min(20),password:z.string().min(8)})),wrap(async(req,res)=>{await service.reset(req.body.token,req.body.password);ok(res,null,'Sandi berhasil diatur ulang');}));
+
 export default r;

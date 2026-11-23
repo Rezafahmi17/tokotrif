@@ -7,6 +7,9 @@ CREATE TABLE IF NOT EXISTS users (
  role ENUM('super_admin','admin_toko','customer') NOT NULL,
  name VARCHAR(120) NOT NULL, email VARCHAR(191) NOT NULL UNIQUE,
  password_hash VARCHAR(255) NOT NULL,phone VARCHAR(32),
+ nim VARCHAR(50) NULL,ktm_url VARCHAR(500) NULL,face_url VARCHAR(500) NULL,
+ ktm_status ENUM('unsubmitted','pending','verified','rejected') NOT NULL DEFAULT 'unsubmitted',
+ ktm_rejection_reason VARCHAR(500) NULL,
  status ENUM('active','suspended','deleted') NOT NULL DEFAULT 'active',
  last_login_at DATETIME NULL,deleted_at DATETIME NULL,
  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -21,6 +24,7 @@ CREATE TABLE IF NOT EXISTS password_resets (
 CREATE TABLE IF NOT EXISTS stores (
  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,owner_user_id BIGINT UNSIGNED NOT NULL UNIQUE,
  name VARCHAR(150) NOT NULL,slug VARCHAR(191) NOT NULL UNIQUE,description TEXT,logo_url VARCHAR(500),
+ ktm_url VARCHAR(500) NULL,face_url VARCHAR(500) NULL,
  city VARCHAR(100) NOT NULL,address VARCHAR(255) NOT NULL,cod_area_note VARCHAR(255),phone VARCHAR(32) NOT NULL,
  status ENUM('pending','approved','rejected','suspended') NOT NULL DEFAULT 'pending',
  rejection_reason TEXT,verified_by BIGINT UNSIGNED NULL,verified_at DATETIME NULL,last_active_at DATETIME NULL,deleted_at DATETIME NULL,
@@ -52,7 +56,7 @@ CREATE TABLE IF NOT EXISTS product_images (
  FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE RESTRICT,INDEX idx_images_product(product_id,sort_order)
 ) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS uploaded_files (
- id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,filename VARCHAR(191) NOT NULL UNIQUE,mime VARCHAR(100) NOT NULL,data MEDIUMBLOB NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,filename VARCHAR(191) NOT NULL UNIQUE,mime VARCHAR(100) NOT NULL,data LONGBLOB NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS orders (
  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,code VARCHAR(40) UNIQUE,
@@ -98,7 +102,8 @@ CREATE TABLE IF NOT EXISTS chat_threads (
 ) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS chat_messages (
  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,thread_id BIGINT UNSIGNED NOT NULL,sender_id BIGINT UNSIGNED NULL,order_id BIGINT UNSIGNED NULL,
- type ENUM('text','product','system') NOT NULL DEFAULT 'text',body VARCHAR(1000) NOT NULL,read_at DATETIME,
+ type ENUM('text','product','system','image','video') NOT NULL DEFAULT 'text',body VARCHAR(1000) NOT NULL,
+ media_url VARCHAR(500) NULL,media_type VARCHAR(30) NULL,read_at DATETIME,
  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
  FOREIGN KEY(thread_id) REFERENCES chat_threads(id) ON DELETE RESTRICT,
  FOREIGN KEY(sender_id) REFERENCES users(id) ON DELETE SET NULL,
