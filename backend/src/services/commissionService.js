@@ -160,7 +160,7 @@ export async function adminVerifyCommission(id,action,actor,reason,ip){
      [comm.store_id,comm.total_commission,`Pembayaran Komisi QRIS Pesanan ${comm.order_code} (${comm.items_sold} barang)`,actor]
     );
    }
-   const rem=await one("SELECT COUNT(*) count FROM store_commissions WHERE store_id=? AND status IN ('unpaid','rejected')",[comm.store_id],c);
+   const rem=await one("SELECT COUNT(*) count FROM store_commissions WHERE store_id=? AND status IN ('unpaid','rejected','waiting_verification')",[comm.store_id],c);
    let reactivated=false;
    if(Number(rem?.count||0)===0&&store?.status==='suspended'){
     await c.query("UPDATE stores SET status='approved',rejection_reason=NULL,verified_at=NOW(),verified_by=? WHERE id=?",[actor,comm.store_id]);

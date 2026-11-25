@@ -190,16 +190,34 @@ export default function Page(){
      <AlertCircle size={16} color="#1669e8" style={{flexShrink:0}}/>
      <span><b>Catatan Sistem Stok:</b> Stok produk <b>tidak akan berkurang</b> saat pembeli baru membuat pesanan (status <i>Menunggu Toko</i>). Stok hanya dikunci setelah Anda menekan <b>Terima & Sepakati COD</b>, dan resmi terpotong saat pesanan <b>Lunas</b>.</span>
     </div>
-    <Table headers={['Nama produk','Harga','Stok Tersedia','Terkonfirmasi COD','Status','Aksi']} items={data.items} render={p=>(
+    <Table headers={['Produk','Harga','Stok Tersedia','Terkonfirmasi COD','Status','Aksi']} items={data.items} render={p=>(
      <>
-      <td><b>{p.name}</b><br/><small>{p.category_name}</small></td>
-      <td>{rp(p.price)}</td>
+      <td>
+       <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <img
+         src={imageSrc(p.primary_image)}
+         alt={p.name}
+         style={{width:44,height:44,objectFit:'cover',borderRadius:8,border:'1px solid #e2e8f0',flexShrink:0}}
+        />
+        <div>
+         <b>{p.name}</b><br/>
+         <small className="muted">{p.category_name}</small>
+        </div>
+       </div>
+      </td>
+      <td><b>{rp(p.price)}</b></td>
       <td><b>{Math.max(0,p.stock-p.reserved)}</b> <small className="muted">(Total: {p.stock})</small></td>
       <td>{p.reserved}</td>
       <td><Status status={p.status}/></td>
       <td>
-       <button onClick={()=>start(p)}><Edit3 size={15} style={{display:'inline'}}/> Ubah</button> &nbsp;
-       <button onClick={()=>archive(p)}><Trash2 size={14} style={{display:'inline'}}/> Arsip</button>
+       <div style={{display:'flex',alignItems:'center',gap:6}}>
+        <button type="button" className="btn btn-outline" style={{minHeight:30,padding:'4px 10px',fontSize:12}} onClick={()=>start(p)}>
+         <Edit3 size={13}/> Ubah
+        </button>
+        <button type="button" className="btn btn-outline" style={{minHeight:30,padding:'4px 10px',fontSize:12,color:'#dc2626',borderColor:'#fecaca'}} onClick={()=>archive(p)}>
+         <Trash2 size={13}/> Arsip
+        </button>
+       </div>
       </td>
      </>
     )}/>

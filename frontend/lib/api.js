@@ -30,4 +30,5 @@ export async function api(path,{method='GET',body,headers={},...opts}={}){
 }
 export const rp=(n)=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Number(n||0));
 export const dateID=(s)=>s?new Date(String(s).replace(' ','T')+'+07:00').toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'}):'-';
-export const statuses={pending:'Menunggu toko',confirmed:'Disepakati',paid:'Lunas',completed:'Selesai',cancelled:'Dibatalkan',approved:'Disetujui',rejected:'Ditolak',suspended:'Ditangguhkan',active:'Aktif',draft:'Draf',archived:'Diarsipkan'};
+export const statuses={pending:'Menunggu toko',confirmed:'Disepakati',paid:'Lunas',completed:'Selesai',cancelled:'Dibatalkan',approved:'Terverifikasi',rejected:'Ditolak',suspended:'Ditangguhkan',active:'Aktif',draft:'Draf',archived:'Diarsipkan',verified:'Terverifikasi',unpaid:'Belum Dibayar',waiting_verification:'Menunggu Verifikasi'};
+export const storeStatuses={pending:'Menunggu Verifikasi',approved:'Terverifikasi',rejected:'Ditolak',suspended:'Ditangguhkan'};

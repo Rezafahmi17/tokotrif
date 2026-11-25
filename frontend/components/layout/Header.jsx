@@ -38,6 +38,8 @@ export default function Header(){
   ['Buka Toko','/daftar-toko']
  ];
 
+ const isDashboardPath=path?.startsWith('/super-admin')||path?.startsWith('/admin-toko');
+
  return (
   <>
    <header className="site-header">
@@ -152,7 +154,7 @@ export default function Header(){
     </div>
    </header>
 
-   <nav className={`subnav ${menu?'mobile-open':''}`}>
+   <nav className={`subnav ${menu?'mobile-open':''} ${isDashboardPath?'subnav-dashboard':''}`}>
     <div className="container nav-content">
      <div className="nav-categories">
       <span><Menu size={16}/> Kategori <ChevronDown size={13}/></span>

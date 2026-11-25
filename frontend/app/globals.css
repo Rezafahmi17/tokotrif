@@ -303,6 +303,11 @@ button:focus-visible, a:focus-visible {
   z-index: 40;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
+@media (min-width: 751px) {
+  .subnav.subnav-dashboard {
+    display: none;
+  }
+}
 .nav-content {
   display: flex;
   align-items: center;
@@ -1872,10 +1877,11 @@ button:focus-visible, a:focus-visible {
 /* Dashboard & Seller Center */
 .dashboard-shell {
   display: grid;
-  grid-template-columns: 230px minmax(0, 1fr);
-  gap: 24px;
-  min-height: 72vh;
-  padding: 24px 0 75px;
+  grid-template-columns: 235px minmax(0, 1fr);
+  gap: 26px;
+  min-height: 76vh;
+  padding: 28px 0 75px;
+  align-items: start;
 }
 .dashboard-sidebar {
   background: #fff;
@@ -1884,24 +1890,24 @@ button:focus-visible, a:focus-visible {
   padding: 18px 12px;
   align-self: start;
   position: sticky;
-  top: 90px;
+  top: 94px;
   box-shadow: var(--shadow-sm);
 }
 .dashboard-sidebar > h3 {
   font-size: 11px;
   letter-spacing: 0.08em;
   color: #94a3b8;
-  margin: 0 10px 16px;
+  margin: 0 10px 14px;
   font-weight: 800;
 }
 .dashboard-sidebar a {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 11px 12px;
+  padding: 10px 12px;
   margin-bottom: 3px;
   border-radius: 9px;
-  color: #64748b;
+  color: #475569;
   font-size: 13px;
   font-weight: 700;
   transition: all 0.15s ease;
@@ -1915,27 +1921,45 @@ button:focus-visible, a:focus-visible {
   color: var(--blue);
   border-left: 3px solid var(--blue);
 }
-.dashboard-content { min-width: 0; }
-.dashboard-content > h1 { font-size: 26px; margin-bottom: 6px; }
-.dashboard-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+.dashboard-content {
+  min-width: 0;
+  padding-top: 2px;
+}
+.dashboard-content > h1 {
+  font-size: 25px;
+  line-height: 1.25;
+  margin-bottom: 6px;
+  color: var(--navy);
+}
+.dashboard-subtitle {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 22px;
+}
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 22px;
 }
 .stat-card {
-  padding: 20px;
+  padding: 18px 20px;
   background: white;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 10px;
   box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-.stat-card > span { font-size: 12px; color: #64748b; font-weight: 700; }
-.stat-card b { font-size: 24px; letter-spacing: -0.04em; color: var(--navy); }
+.stat-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+.stat-card span { font-size: 12px; color: #64748b; font-weight: 700; }
+.stat-card b { font-size: 22px; letter-spacing: -0.03em; color: var(--navy); word-break: break-word; }
 .data-table-wrap {
   overflow-x: auto;
   max-width: 100%;
@@ -1948,23 +1972,51 @@ button:focus-visible, a:focus-visible {
   border-collapse: collapse;
   width: 100%;
   font-size: 13px;
-  white-space: nowrap;
 }
 .data-table th, .data-table td {
   text-align: left;
-  padding: 13px 16px;
+  padding: 13px 14px;
   border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
 }
 .data-table th {
   background: #f8fafc;
-  color: #64748b;
+  color: #475569;
   font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.data-table td {
+  color: #1e293b;
+  line-height: 1.45;
+}
+.data-table tr:hover td {
+  background: #fafcff;
 }
 .data-table tr:last-child td { border-bottom: 0; }
-.data-table button { font-size: 12px; font-weight: 700; color: var(--blue); }
+.data-table button:not(.btn) {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--blue);
+  background: transparent;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+.data-table button:not(.btn):hover {
+  background: #eff6ff;
+}
+.data-table .btn-primary {
+  color: #ffffff !important;
+}
+.data-table .btn-danger {
+  color: #ffffff !important;
+}
+.data-table .btn-amber {
+  color: var(--navy) !important;
+}
 .admin-toolbar {
   display: flex;
   align-items: center;

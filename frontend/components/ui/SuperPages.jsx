@@ -41,6 +41,7 @@ export default function SuperPages({kind}){
  const [settings,setSettings]=useState([]);
  const [q,setQ]=useState('');
  const [status,setStatus]=useState(kind==='verification'?'pending':'');
+ const [page,setPage]=useState(1);
  const [editing,setEditing]=useState(null);
  const [form,setForm]=useState({});
  const [busy,setBusy]=useState(false);
@@ -52,14 +53,14 @@ export default function SuperPages({kind}){
  const load=()=>{
   if(kind==='dashboard')api('/admin/stats').then(setStats).catch(e=>show(e.message,'error'));
   if(['verification','stores'].includes(kind)){
-   api(`/admin/stores?status=${status}&q=${encodeURIComponent(q)}`).then(setStores).catch(e=>show(e.message,'error'));
+   api(`/admin/stores?page=${page}&status=${status}&q=${encodeURIComponent(q)}`).then(setStores).catch(e=>show(e.message,'error'));
    if(kind==='verification'){
     api(`/admin/ktm-users?status=${status==='approved'?'verified':status}&q=${encodeURIComponent(q)}`).then(setKtmUsers).catch(()=>{});
    }
   }
   if(kind==='commissions'){
    setCommError('');
-   api(`/admin/commissions?status=${status}&q=${encodeURIComponent(q)}`).then(res=>{
+   api(`/admin/commissions?page=${page}&status=${status}&q=${encodeURIComponent(q)}`).then(res=>{
     setCommData(res);
     if(res?.config)setCommConfig(res.config);
    }).catch(e=>{
@@ -69,11 +70,11 @@ export default function SuperPages({kind}){
   }
   if(kind==='categories')api('/admin/categories').then(setCats).catch(e=>show(e.message,'error'));
   if(kind==='banners')api('/admin/banners').then(setBanners).catch(e=>show(e.message,'error'));
-  if(kind==='audit')api('/admin/audit-logs').then(setAudits).catch(e=>show(e.message,'error'));
+  if(kind==='audit')api(`/admin/audit-logs?page=${page}`).then(setAudits).catch(e=>show(e.message,'error'));
   if(kind==='settings')api('/admin/settings').then(setSettings).catch(e=>show(e.message,'error'));
  };
 
- useEffect(()=>{load();},[kind,status,q]);
+ useEffect(()=>{load();},[kind,status,q,page]);
 
  const act=async(s,action)=>{
   let body=undefined;
@@ -288,7 +289,7 @@ export default function SuperPages({kind}){
            <td><b>{s.name}</b></td>
            <td>{s.owner_name}<br/><small className="muted">{s.owner_email}</small></td>
            <td>{s.city}</td>
-           <td><Status status={s.status}/></td>
+           <td><Status status={s.status} type="store"/></td>
            <td>
             <span style={{display:'inline-flex',alignItems:'center',gap:6,background:actInfo.bg,color:actInfo.color,fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:99,marginBottom:3}}>
              <span style={{width:7,height:7,borderRadius:'50%',background:actInfo.dot}}/>
@@ -408,9 +409,9 @@ export default function SuperPages({kind}){
             </span>
            </td>
            <td><b style={{color:'#dc2626'}}>{rp(ds.unpaid_total)}</b></td>
-           <td><Status status={ds.status}/></td>
+           <td><Status status={ds.status} type="store"/></td>
            <td>
-            <div className="flex gap-2 flex-wrap">
+            <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'nowrap'}}>
              {ds.status!=='suspended'&&(
               <button
                type="button"
@@ -441,8 +442,8 @@ export default function SuperPages({kind}){
 
       <div className="panel">
        <div className="admin-toolbar" style={{marginBottom:14}}>
-        <input className="field" placeholder="Cari nama toko atau kode pesanan..." value={q} onChange={e=>setQ(e.target.value)}/>
-        <select className="field" style={{maxWidth:230}} value={status} onChange={e=>setStatus(e.target.value)}>
+        <input className="field" placeholder="Cari nama toko atau kode pesanan..." value={q} onChange={e=>{setQ(e.target.value);setPage(1);}}/>
+        <select className="field" style={{maxWidth:230}} value={status} onChange={e=>{setStatus(e.target.value);setPage(1);}}>
          <option value="">Semua Status Komisi</option>
          <option value="waiting_verification">Menunggu Verifikasi QRIS</option>
          <option value="unpaid">Belum Dibayar</option>
@@ -480,10 +481,10 @@ export default function SuperPages({kind}){
                src={imageSrc(item.proof_url)}
                alt="Bukti QRIS"
                onClick={()=>setPreviewImage(imageSrc(item.proof_url))}
-               style={{width:46,height:46,objectFit:'cover',borderRadius:6,border:'1px solid #cbd5e1',cursor:'pointer'}}
+               style={{width:44,height:44,objectFit:'cover',borderRadius:6,border:'1px solid #cbd5e1',cursor:'pointer'}}
               />
-              <button type="button" className="text-link" style={{fontSize:11.5}} onClick={()=>setPreviewImage(imageSrc(item.proof_url))}>
-               <Eye size={13} style={{display:'inline'}}/> Perbesar
+              <button type="button" className="text-link" style={{fontSize:11.5,display:'inline-flex',alignItems:'center',gap:4}} onClick={()=>setPreviewImage(imageSrc(item.proof_url))}>
+               <Eye size={13}/> Perbesar
               </button>
              </div>
             ):(
@@ -491,26 +492,31 @@ export default function SuperPages({kind}){
             )}
            </td>
            <td>
-            <div className="flex gap-2 flex-wrap">
+            <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'nowrap'}}>
              {item.status!=='paid'&&item.proof_url&&(
               <button
+               type="button"
                className="btn btn-primary"
-               style={{minHeight:30,padding:'4px 10px',fontSize:12}}
+               style={{minHeight:32,padding:'5px 11px',fontSize:12,color:'#ffffff'}}
                disabled={busy}
                onClick={()=>verifyComm(item,'approve')}
               >
-               Setujui Lunas
+               <CheckCircle2 size={14}/> Setujui Lunas
               </button>
              )}
              {item.status==='waiting_verification'&&(
               <button
+               type="button"
                className="btn btn-outline"
-               style={{minHeight:30,padding:'4px 10px',fontSize:12,color:'#dc2626',borderColor:'#fecaca'}}
+               style={{minHeight:32,padding:'5px 11px',fontSize:12,color:'#dc2626',borderColor:'#fecaca'}}
                disabled={busy}
                onClick={()=>verifyComm(item,'reject')}
               >
-               Tolak
+               <XCircle size={14}/> Tolak
               </button>
+             )}
+             {item.status==='paid'&&(
+              <span className="muted text-xs">Terverifikasi</span>
              )}
             </div>
            </td>
@@ -518,6 +524,7 @@ export default function SuperPages({kind}){
          );
         }}
        />
+       <Pagination pagination={commData.pagination} onPage={setPage}/>
       </div>
      </>
     )
@@ -537,10 +544,13 @@ export default function SuperPages({kind}){
      )}
 
      <div className="admin-toolbar">
-      <input className="field" placeholder="Cari nama toko, mahasiswa, NIM, atau email..." value={q} onChange={e=>setQ(e.target.value)}/>
-      <select className="field" style={{maxWidth:210}} value={status} onChange={e=>setStatus(e.target.value)}>
-       <option value="">Semua status</option>
-       {['pending','approved','rejected','suspended'].map(s=><option key={s} value={s}>{s}</option>)}
+      <input className="field" placeholder="Cari nama toko, mahasiswa, NIM, atau email..." value={q} onChange={e=>{setQ(e.target.value);setPage(1);}}/>
+      <select className="field" style={{maxWidth:230}} value={status} onChange={e=>{setStatus(e.target.value);setPage(1);}}>
+       <option value="">Semua Status</option>
+       <option value="pending">Menunggu Verifikasi</option>
+       <option value="approved">Terverifikasi</option>
+       <option value="rejected">Ditolak</option>
+       <option value="suspended">Ditangguhkan</option>
       </select>
      </div>
 
@@ -590,14 +600,14 @@ export default function SuperPages({kind}){
               <button
                type="button"
                onClick={()=>setInspectModal({type:'store',item:s})}
-               style={{fontSize:11,color:'#1669e8',fontWeight:700,display:'inline-flex',alignItems:'center',gap:3}}
+               style={{fontSize:11.5,color:'#1669e8',fontWeight:700,display:'inline-flex',alignItems:'center',gap:4}}
               >
                <Eye size={13}/> Tinjau
               </button>
              </div>
             </td>
             <td>
-             <Status status={s.status}/>
+             <Status status={s.status} type="store"/>
              {s.isInactive?<span className="badge status-rejected" style={{marginLeft:4}}>Tidak aktif</span>:null}
              {Number(s.unpaid_commissions_count||0)>0&&(
               <div style={{marginTop:4}}>
@@ -616,24 +626,48 @@ export default function SuperPages({kind}){
              <small className="muted" style={{fontSize:11}}>{actInfo.exact}</small>
             </td>
             <td>
-             <div className="flex gap-2 flex-wrap">
+             <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'nowrap'}}>
               {['pending','rejected','suspended'].includes(s.status)&&(
-               <button className="btn btn-primary" style={{minHeight:30,padding:'4px 10px',fontSize:12}} disabled={busy} onClick={()=>act(s,s.status==='suspended'?'reactivate':'approve')}>
-                {s.status==='suspended'?'Aktifkan':'Setujui'}
+               <button
+                type="button"
+                className="btn btn-primary"
+                style={{minHeight:32,padding:'5px 11px',fontSize:12,color:'#ffffff'}}
+                disabled={busy}
+                onClick={()=>act(s,s.status==='suspended'?'reactivate':'approve')}
+               >
+                <CheckCircle2 size={14}/> {s.status==='suspended'?'Aktifkan':'Setujui'}
                </button>
               )}
               {s.status==='pending'&&(
-               <button className="btn btn-outline" style={{minHeight:30,padding:'4px 10px',fontSize:12,color:'#dc2626',borderColor:'#fecaca'}} disabled={busy} onClick={()=>act(s,'reject')}>
-                Tolak
+               <button
+                type="button"
+                className="btn btn-outline"
+                style={{minHeight:32,padding:'5px 11px',fontSize:12,color:'#dc2626',borderColor:'#fecaca'}}
+                disabled={busy}
+                onClick={()=>act(s,'reject')}
+               >
+                <XCircle size={14}/> Tolak
                </button>
               )}
               {s.status==='approved'&&(
-               <button className="btn btn-outline" style={{minHeight:30,padding:'4px 10px',fontSize:12}} disabled={busy} onClick={()=>act(s,'suspend')}>
+               <button
+                type="button"
+                className="btn btn-outline"
+                style={{minHeight:32,padding:'5px 11px',fontSize:12}}
+                disabled={busy}
+                onClick={()=>act(s,'suspend')}
+               >
                 Tangguhkan
                </button>
               )}
               {kind==='stores'&&(
-               <button className="btn btn-outline" style={{minHeight:30,padding:'4px 10px',fontSize:12,color:'#dc2626',borderColor:'#fecaca'}} disabled={busy} onClick={()=>act(s,'delete')}>
+               <button
+                type="button"
+                className="btn btn-outline"
+                style={{minHeight:32,padding:'5px 11px',fontSize:12,color:'#dc2626',borderColor:'#fecaca'}}
+                disabled={busy}
+                onClick={()=>act(s,'delete')}
+               >
                 Hapus
                </button>
               )}
@@ -643,7 +677,7 @@ export default function SuperPages({kind}){
           );
          }}
         />
-        <Pagination pagination={stores.pagination} onPage={()=>{}}/>
+        <Pagination pagination={stores.pagination} onPage={setPage}/>
        </>
       )
      )}
@@ -684,15 +718,15 @@ export default function SuperPages({kind}){
           </td>
           <td><small className="muted">{dateID(u.last_login_at||u.created_at)}</small></td>
           <td>
-           <div className="flex gap-2">
+           <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'nowrap'}}>
             {u.ktm_status!=='verified'&&(
-             <button className="btn btn-primary" style={{minHeight:30,padding:'4px 10px',fontSize:12}} disabled={busy} onClick={()=>actBuyerKtm(u,'approve')}>
-              Setujui KTM
+             <button type="button" className="btn btn-primary" style={{minHeight:32,padding:'5px 11px',fontSize:12,color:'#ffffff'}} disabled={busy} onClick={()=>actBuyerKtm(u,'approve')}>
+              <CheckCircle2 size={14}/> Setujui KTM
              </button>
             )}
             {u.ktm_status==='pending'&&(
-             <button className="btn btn-outline" style={{minHeight:30,padding:'4px 10px',fontSize:12,color:'#dc2626'}} disabled={busy} onClick={()=>actBuyerKtm(u,'reject')}>
-              Tolak
+             <button type="button" className="btn btn-outline" style={{minHeight:32,padding:'5px 11px',fontSize:12,color:'#dc2626',borderColor:'#fecaca'}} disabled={busy} onClick={()=>actBuyerKtm(u,'reject')}>
+              <XCircle size={14}/> Tolak
              </button>
             )}
            </div>
@@ -757,10 +791,12 @@ export default function SuperPages({kind}){
         <td><b>{r.name||r.title}</b></td>
         <td>{r.slug||r.placement}</td>
         <td>{kind==='categories'?(r.parent_name||'Utama'):r.cta_link}</td>
-        <td>{r.is_active?'Ya':'Tidak'}</td>
+        <td><span className={`badge ${r.is_active?'status-approved':'status-cancelled'}`}>{r.is_active?'Aktif':'Nonaktif'}</span></td>
         <td>
-         <button onClick={()=>edit(r)}>Ubah</button> &nbsp;
-         <button onClick={()=>remove(r.id,kind==='categories'?'categories':'banners')} style={{color:'#dc2626'}}>Hapus</button>
+         <div style={{display:'flex',alignItems:'center',gap:6}}>
+          <button type="button" className="btn btn-outline" style={{minHeight:30,padding:'4px 10px',fontSize:12}} onClick={()=>edit(r)}>Ubah</button>
+          <button type="button" className="btn btn-outline" style={{minHeight:30,padding:'4px 10px',fontSize:12,color:'#dc2626',borderColor:'#fecaca'}} onClick={()=>remove(r.id,kind==='categories'?'categories':'banners')}>Hapus</button>
+         </div>
         </td>
        </>
       )}
@@ -770,19 +806,22 @@ export default function SuperPages({kind}){
 
    {kind==='audit'&&(
     audits?(
-     <Table
-      headers={['Waktu','Admin','Aksi','Objek','ID']}
-      items={audits.items}
-      render={a=>(
-       <>
-        <td>{dateID(a.created_at)}</td>
-        <td>{a.actor_name||'-'}</td>
-        <td>{a.action}</td>
-        <td>{a.target_type}</td>
-        <td>{a.target_id}</td>
-       </>
-      )}
-     />
+     <>
+      <Table
+       headers={['Waktu','Admin','Aksi','Objek','ID']}
+       items={audits.items}
+       render={a=>(
+        <>
+         <td>{dateID(a.created_at)}</td>
+         <td><b>{a.actor_name||'-'}</b></td>
+         <td><span className="badge status-confirmed">{a.action}</span></td>
+         <td>{a.target_type}</td>
+         <td>{a.target_id}</td>
+        </>
+       )}
+      />
+      <Pagination pagination={audits.pagination} onPage={setPage}/>
+     </>
     ):<p>Memuat...</p>
    )}
 
