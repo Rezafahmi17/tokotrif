@@ -86,17 +86,25 @@ export default function Page(){
           <h3 style={{margin:0}}>{o.store_name}</h3>
           <Badge status={o.status}>{statuses[o.status]}</Badge>
          </div>
-         {o.items.map(it=>(
-          <div key={it.id} className="price-row">
-           <div style={{display:'flex',alignItems:'center',gap:10}}>
-            {it.product_image&&(
-             <img src={imageSrc(it.product_image)} alt={it.product_name} style={{width:40,height:40,borderRadius:8,objectFit:'cover',border:'1px solid #e2e8f0'}}/>
-            )}
-            <span><b>{it.product_name}</b> × {it.qty}</span>
+         {o.items.map(it=>{
+          const itemImg=imageSrc(it.image_url||it.product_image);
+          return (
+           <div key={it.id} className="price-row">
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+             {itemImg&&(
+              <img
+               src={itemImg}
+               alt={it.product_name}
+               style={{width:40,height:40,borderRadius:8,objectFit:'cover',border:'1px solid #e2e8f0'}}
+               onError={e=>{e.currentTarget.style.display='none';}}
+              />
+             )}
+             <span><b>{it.product_name}</b> × {it.qty}</span>
+            </div>
+            <b>{rp(it.line_total)}</b>
            </div>
-           <b>{rp(it.line_total)}</b>
-          </div>
-         ))}
+          );
+         })}
          <div className="price-row total">
           <span>Total Tunai COD</span>
           <span>{rp(o.total)}</span>

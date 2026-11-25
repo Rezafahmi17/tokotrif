@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useState} from 'react';
-import {Plus,Edit3,Trash2,ImagePlus,Star,Check,AlertCircle} from 'lucide-react';
+import {Plus,Edit3,Trash2,ImagePlus,Star,Check,AlertCircle,Package} from 'lucide-react';
 import DashboardShell from '@/components/layout/DashboardShell';
 import {Table,Status} from '@/components/ui/AdminBits';
 import {Button,Pagination} from '@/components/ui/Elements';
@@ -190,37 +190,48 @@ export default function Page(){
      <AlertCircle size={16} color="#1669e8" style={{flexShrink:0}}/>
      <span><b>Catatan Sistem Stok:</b> Stok produk <b>tidak akan berkurang</b> saat pembeli baru membuat pesanan (status <i>Menunggu Toko</i>). Stok hanya dikunci setelah Anda menekan <b>Terima & Sepakati COD</b>, dan resmi terpotong saat pesanan <b>Lunas</b>.</span>
     </div>
-    <Table headers={['Produk','Harga','Stok Tersedia','Terkonfirmasi COD','Status','Aksi']} items={data.items} render={p=>(
-     <>
-      <td>
-       <div style={{display:'flex',alignItems:'center',gap:10}}>
-        <img
-         src={imageSrc(p.primary_image)}
-         alt={p.name}
-         style={{width:44,height:44,objectFit:'cover',borderRadius:8,border:'1px solid #e2e8f0',flexShrink:0}}
-        />
-        <div>
-         <b>{p.name}</b><br/>
-         <small className="muted">{p.category_name}</small>
+    <Table headers={['Produk','Harga','Stok Tersedia','Terkonfirmasi COD','Status','Aksi']} items={data.items} render={p=>{
+     const thumb=imageSrc(p.image_url||p.primary_image);
+     return (
+      <>
+       <td>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+         <div style={{width:44,height:44,borderRadius:8,border:'1px solid #e2e8f0',background:'#f1f5f9',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0}}>
+          {thumb?(
+           <img
+            src={thumb}
+            alt={p.name}
+            style={{width:'100%',height:'100%',objectFit:'cover'}}
+            onError={e=>{e.currentTarget.style.display='none';if(e.currentTarget.nextSibling)e.currentTarget.nextSibling.style.display='flex';}}
+           />
+          ):null}
+          <span style={{display:thumb?'none':'flex',alignItems:'center',justifyContent:'center',color:'#64748b'}}>
+           <Package size={20}/>
+          </span>
+         </div>
+         <div>
+          <b>{p.name}</b><br/>
+          <small className="muted">{p.category_name}</small>
+         </div>
         </div>
-       </div>
-      </td>
-      <td><b>{rp(p.price)}</b></td>
-      <td><b>{Math.max(0,p.stock-p.reserved)}</b> <small className="muted">(Total: {p.stock})</small></td>
-      <td>{p.reserved}</td>
-      <td><Status status={p.status}/></td>
-      <td>
-       <div style={{display:'flex',alignItems:'center',gap:6}}>
-        <button type="button" className="btn btn-outline" style={{minHeight:30,padding:'4px 10px',fontSize:12}} onClick={()=>start(p)}>
-         <Edit3 size={13}/> Ubah
-        </button>
-        <button type="button" className="btn btn-outline" style={{minHeight:30,padding:'4px 10px',fontSize:12,color:'#dc2626',borderColor:'#fecaca'}} onClick={()=>archive(p)}>
-         <Trash2 size={13}/> Arsip
-        </button>
-       </div>
-      </td>
-     </>
-    )}/>
+       </td>
+       <td><b>{rp(p.price)}</b></td>
+       <td><b>{Math.max(0,p.stock-p.reserved)}</b> <small className="muted">(Total: {p.stock})</small></td>
+       <td>{p.reserved}</td>
+       <td><Status status={p.status}/></td>
+       <td>
+        <div style={{display:'flex',alignItems:'center',gap:6}}>
+         <button type="button" className="btn btn-outline" style={{minHeight:30,padding:'4px 10px',fontSize:12}} onClick={()=>start(p)}>
+          <Edit3 size={13}/> Ubah
+         </button>
+         <button type="button" className="btn btn-outline" style={{minHeight:30,padding:'4px 10px',fontSize:12,color:'#dc2626',borderColor:'#fecaca'}} onClick={()=>archive(p)}>
+          <Trash2 size={13}/> Arsip
+         </button>
+        </div>
+       </td>
+      </>
+     );
+    }}/>
     <Pagination pagination={data.pagination} onPage={setPage}/>
    </>
   )}
