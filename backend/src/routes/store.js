@@ -23,8 +23,23 @@ r.post('/commissions/pay',storeScopeAllowSuspended,validate(z.object({
 })),wrap(async(req,res)=>ok(res,await comm.submitCommissionPayment(req.store.id,req.user.id,req.body.commission_ids,req.body.proof_url),'Bukti pembayaran komisi QRIS berhasil dikirim ke Super Admin')));
 
 // Endpoint operasional toko (wajib berstatus approved)
-r.patch('/profile',storeScope,validate(z.object({name:z.string().min(3).optional(),description:z.string().max(2000).optional(),city:z.string().min(2).optional(),address:z.string().min(5).optional(),phone:z.string().min(8).optional(),cod_area_note:z.string().optional(),logo_url:z.string().optional(),ktm_url:z.string().optional(),face_url:z.string().optional()})),wrap(async(req,res)=>{const entries=Object.entries(req.body);if(!entries.length)return ok(res);await db.query(`UPDATE stores SET ${entries.map(([k])=>`${k}=?`).join(',')},last_active_at=NOW() WHERE id=?`,[...entries.map(([,v])=>v),req.store.id]);if(req.body.ktm_url||req.body.face_url){await db.query('UPDATE users SET ktm_url=COALESCE(?,ktm_url),face_url=COALESCE(?,face_url) WHERE id=?',[req.body.ktm_url||null,req.body.face_url||null,req.user.id]);}ok(res,null,'Profil diperbarui');}));
-r.post('/profile/logo',storeScope,upload.single('image'),wrap(async(req,res)=>{const url=await saveImage(req.file);await db.query('UPDATE stores SET logo_url=? WHERE id=?',[url,req.store.id]);ok(res,{url});}));
+r.patch('/profile',storeScope,validate(z.object({name:z.string().min(3).optional(),description:z.string().max(2000).optional(),city:z.string().min(2).optional(),address:z.string().min(5).optional(),phone:z.string().min(8).optional(),cod_area_note:z.string().optional(),logo_url:z.string().optional(),ktm_url:z.string().optional(),face_url:z.string().optional()})),wrap(async(req,res)=>{
+ const entries=Object.entries(req.body);
+ if(entries.length){
+  await db.query(`UPDATE stores SET ${entries.map(([k])=>`${k}=?`).join(',')},last_active_at=NOW() WHERE id=?`,[...entries.map(([,v])=>v),req.store.id]);
+ }
+ if(req.body.ktm_url||req.body.face_url){
+  const nextKtmStatus=req.store.status==='approved'?'verified':'pending';
+  await db.query('UPDATE users SET ktm_url=COALESCE(?,ktm_url),face_url=COALESCE(?,face_url),ktm_status=? WHERE id=?',[req.body.ktm_url||null,req.body.face_url||null,nextKtmStatus,req.user.id]);
+ }
+ const [updated]=await db.query('SELECT * FROM stores WHERE id=?',[req.store.id]);
+ ok(res,updated?.[0]||req.store,'Profil diperbarui');
+}));
+r.post('/profile/logo',storeScopeAllowSuspended,upload.single('image'),wrap(async(req,res)=>{
+ const url=await saveImage(req.file);
+ await db.query('UPDATE stores SET logo_url=?,last_active_at=NOW() WHERE id=?',[url,req.store.id]);
+ ok(res,{url},'Logo toko berhasil diperbarui');
+}));
 r.get('/dashboard',storeScope,wrap(async(req,res)=>ok(res,await s.dashboard(req.store.id))));
 const expense=z.object({category:z.string().min(2).max(100),amount:z.coerce.number().positive(),description:z.string().max(500).optional(),trx_date:z.string().regex(/^\d{4}-\d{2}-\d{2}$/)});
 r.get('/finance/summary',storeScope,wrap(async(req,res)=>ok(res,await s.summary(req.store.id,req.query))));

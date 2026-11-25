@@ -45,6 +45,7 @@ export const verificationSchema=z.object({
 export const loginSchema=z.object({email:z.string().email(),password:z.string().min(1)});
 export const credentialsSchema=z.object({oldPassword:z.string().min(1),newPassword:z.string().min(8)});
 export const emailSchema=z.object({oldPassword:z.string().min(1),email:z.string().email()});
+export const profileUpdateSchema=z.object({name:z.string().min(2).max(120),phone:z.string().max(32).optional().nullable()});
 
 export async function register(body,isStore=false){
  const email=body.email.trim().toLowerCase();
@@ -98,10 +99,24 @@ export async function updateVerification(userId,body){
  const nextKtm=body.ktm_url||user.ktm_url||null;
  const nextFace=body.face_url||user.face_url||null;
  const nextNim=body.nim!==undefined?body.nim:user.nim;
- const nextStatus=nextKtm?(user.ktm_status==='verified'&&!body.ktm_url?'verified':'pending'):'unsubmitted';
+ let store=null;
+ if(user.role==='admin_toko'){
+  store=await one('SELECT id,status FROM stores WHERE owner_user_id=? AND deleted_at IS NULL',[userId]);
+ }
+ const isNewDocUploaded=Boolean((body.ktm_url&&body.ktm_url!==user.ktm_url)||(body.face_url&&body.face_url!==user.face_url));
+ let nextStatus='unsubmitted';
+ if(nextKtm){
+  if(store?.status==='approved'){
+   nextStatus='verified';
+  }else if(user.ktm_status==='verified'&&!isNewDocUploaded){
+   nextStatus='verified';
+  }else{
+   nextStatus='pending';
+  }
+ }
  await db.query('UPDATE users SET nim=?,ktm_url=?,face_url=?,ktm_status=?,ktm_rejection_reason=NULL WHERE id=?',[nextNim||null,nextKtm,nextFace,nextStatus,userId]);
  if(user.role==='admin_toko'){
-  await db.query('UPDATE stores SET ktm_url=COALESCE(?,ktm_url),face_url=COALESCE(?,face_url),last_active_at=NOW() WHERE owner_user_id=? AND deleted_at IS NULL',[body.ktm_url||null,body.face_url||null,userId]);
+  await db.query('UPDATE stores SET ktm_url=COALESCE(?,ktm_url),face_url=COALESCE(?,face_url),last_active_at=NOW() WHERE owner_user_id=? AND deleted_at IS NULL',[nextKtm,nextFace,userId]);
  }
  return profile(userId);
 }
@@ -119,9 +134,18 @@ export async function login(body){
 export async function profile(id){
  const user=await one('SELECT id,role,name,email,phone,nim,ktm_url,face_url,ktm_status,ktm_rejection_reason,status,last_login_at,created_at FROM users WHERE id=?',[id]);
  if(user?.role==='admin_toko'){
-  user.store=await one('SELECT id,name,slug,status,rejection_reason,city,ktm_url,face_url,last_active_at FROM stores WHERE owner_user_id=? AND deleted_at IS NULL',[id]);
+  user.store=await one('SELECT id,name,slug,status,rejection_reason,city,logo_url,ktm_url,face_url,last_active_at FROM stores WHERE owner_user_id=? AND deleted_at IS NULL',[id]);
+  if(user.store?.status==='approved'&&(user.ktm_url||user.store?.ktm_url)&&user.ktm_status!=='verified'){
+   await db.query("UPDATE users SET ktm_status='verified' WHERE id=?",[id]);
+   user.ktm_status='verified';
+  }
  }
  return user;
+}
+
+export async function updateProfile(id,body){
+ await db.query('UPDATE users SET name=?,phone=COALESCE(?,phone) WHERE id=?',[body.name.trim(),body.phone?.trim()||null,id]);
+ return profile(id);
 }
 
 export async function updatePassword(id,body){

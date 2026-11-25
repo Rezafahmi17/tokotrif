@@ -1,10 +1,11 @@
 'use client';
 import {useEffect,useState} from 'react';
-import {Store,Clock,Users,ShoppingBag,Plus,IdCard,Eye,X,Activity,CheckCircle2,XCircle,QrCode,Wallet,AlertTriangle,Upload,ShieldAlert,RefreshCw} from 'lucide-react';
+import {Store,Clock,Users,ShoppingBag,Plus,IdCard,Eye,X,Activity,CheckCircle2,XCircle,QrCode,Wallet,AlertTriangle,Upload,ShieldAlert,RefreshCw,UserRound,Mail,KeyRound,Settings,ShieldCheck} from 'lucide-react';
 import DashboardShell from '@/components/layout/DashboardShell';
 import {StatCards,Table,Status} from '@/components/ui/AdminBits';
 import {Button,Pagination} from '@/components/ui/Elements';
 import {useToast} from '@/components/ui/Toast';
+import {useAuth} from '@/context/AuthContext';
 import {api,dateID,imageSrc,rp} from '@/lib/api';
 
 function formatLastActive(minutesAgo,dateStr){
@@ -28,6 +29,7 @@ const commStatusBadge={
 
 export default function SuperPages({kind}){
  const {show}=useToast();
+ const {user,refresh}=useAuth();
  const [stats,setStats]=useState(null);
  const [stores,setStores]=useState(null);
  const [ktmUsers,setKtmUsers]=useState(null);
@@ -39,6 +41,9 @@ export default function SuperPages({kind}){
  const [banners,setBanners]=useState([]);
  const [audits,setAudits]=useState(null);
  const [settings,setSettings]=useState([]);
+ const [adminProfile,setAdminProfile]=useState({name:'',phone:''});
+ const [adminEmail,setAdminEmail]=useState({email:'',oldPassword:''});
+ const [adminPwd,setAdminPwd]=useState({oldPassword:'',newPassword:'',confirmPassword:''});
  const [q,setQ]=useState('');
  const [status,setStatus]=useState(kind==='verification'?'pending':'');
  const [page,setPage]=useState(1);
@@ -49,6 +54,13 @@ export default function SuperPages({kind}){
  const [file,setFile]=useState(null);
  const [inspectModal,setInspectModal]=useState(null);
  const [previewImage,setPreviewImage]=useState(null);
+
+ useEffect(()=>{
+  if(user){
+   setAdminProfile({name:user.name||'',phone:user.phone||''});
+   setAdminEmail(prev=>({...prev,email:user.email||''}));
+  }
+ },[user]);
 
  const load=()=>{
   if(kind==='dashboard')api('/admin/stats').then(setStats).catch(e=>show(e.message,'error'));
@@ -284,9 +296,21 @@ export default function SuperPages({kind}){
         items={stats.recentStores||[]}
         render={s=>{
          const actInfo=formatLastActive(s.minutes_ago,s.last_active_at);
+         const logo=imageSrc(s.logo_url);
          return (
           <>
-           <td><b>{s.name}</b></td>
+           <td>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+             <div style={{width:38,height:38,borderRadius:10,border:'1px solid #e2e8f0',background:'#f8fafc',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0}}>
+              {logo?(
+               <img src={logo} alt={s.name} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e=>{e.currentTarget.style.display='none';}}/>
+              ):(
+               <Store size={17} color="#1669e8"/>
+              )}
+             </div>
+             <b>{s.name}</b>
+            </div>
+           </td>
            <td>{s.owner_name}<br/><small className="muted">{s.owner_email}</small></td>
            <td>{s.city}</td>
            <td><Status status={s.status} type="store"/></td>
@@ -562,11 +586,31 @@ export default function SuperPages({kind}){
          items={stores.items}
          render={s=>{
           const actInfo=formatLastActive(s.minutes_ago,s.last_active_at);
+          const logo=imageSrc(s.logo_url);
+          const needsVerify=['pending','rejected','suspended'].includes(s.status)||s.owner_ktm_status==='pending';
           return (
            <>
             <td>
-             <b>{s.name}</b><br/>
-             <small className="muted">{s.city} · {s.product_count} produk · {s.order_count} pesanan</small>
+             <div style={{display:'flex',alignItems:'center',gap:11}}>
+              <div style={{width:44,height:44,borderRadius:10,border:'1px solid #cbd5e1',background:'#f8fafc',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0}}>
+               {logo?(
+                <img
+                 src={logo}
+                 alt={s.name}
+                 style={{width:'100%',height:'100%',objectFit:'cover',cursor:'pointer'}}
+                 onClick={()=>setPreviewImage(logo)}
+                 onError={e=>{e.currentTarget.style.display='none';}}
+                 title="Klik untuk memperbesar Logo Toko"
+                />
+               ):(
+                <Store size={20} color="#1669e8"/>
+               )}
+              </div>
+              <div>
+               <b>{s.name}</b><br/>
+               <small className="muted">{s.city} · {s.product_count} produk · {s.order_count} pesanan</small>
+              </div>
+             </div>
             </td>
             <td>
              <b>{s.owner_name}</b><br/>
@@ -608,6 +652,11 @@ export default function SuperPages({kind}){
             </td>
             <td>
              <Status status={s.status} type="store"/>
+             {s.status==='approved'&&s.owner_ktm_status==='pending'&&(
+              <div style={{marginTop:4}}>
+               <span className="badge status-pending" style={{fontSize:10}}>KTM Baru Menunggu Verifikasi</span>
+              </div>
+             )}
              {s.isInactive?<span className="badge status-rejected" style={{marginLeft:4}}>Tidak aktif</span>:null}
              {Number(s.unpaid_commissions_count||0)>0&&(
               <div style={{marginTop:4}}>
@@ -627,7 +676,7 @@ export default function SuperPages({kind}){
             </td>
             <td>
              <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'nowrap'}}>
-              {['pending','rejected','suspended'].includes(s.status)&&(
+              {needsVerify&&(
                <button
                 type="button"
                 className="btn btn-primary"
@@ -638,7 +687,7 @@ export default function SuperPages({kind}){
                 <CheckCircle2 size={14}/> {s.status==='suspended'?'Aktifkan':'Setujui'}
                </button>
               )}
-              {s.status==='pending'&&(
+              {(s.status==='pending'||s.owner_ktm_status==='pending')&&(
                <button
                 type="button"
                 className="btn btn-outline"
@@ -649,7 +698,7 @@ export default function SuperPages({kind}){
                 <XCircle size={14}/> Tolak
                </button>
               )}
-              {s.status==='approved'&&(
+              {s.status==='approved'&&s.owner_ktm_status!=='pending'&&(
                <button
                 type="button"
                 className="btn btn-outline"
@@ -826,39 +875,269 @@ export default function SuperPages({kind}){
    )}
 
    {kind==='settings'&&(
-    <div className="panel" style={{maxWidth:550}}>
-     <h3>Batas toko tidak aktif</h3>
-     <p className="muted text-xs" style={{margin:'8px 0 16px'}}>
-      Toko ditandai tidak aktif jika tidak ada aktivitas login, chat, atau pesanan selama batas hari ini.
-     </p>
-     <form onSubmit={async e=>{
-      e.preventDefault();setBusy(true);
-      try{
-       await api('/admin/settings',{method:'PATCH',body:{inactive_days:Number(form.inactive_days||settings.find(s=>s.key==='inactive_days')?.value||30)}});
-       show('Pengaturan disimpan');load();
-      }catch(e){show(e.message,'error');}finally{setBusy(false);}
-     }}>
-      <div className="form-field">
-       <label>Jumlah hari (1–365)</label>
-       <input type="number" min={1} max={365} value={form.inactive_days??settings.find(s=>s.key==='inactive_days')?.value??30} onChange={e=>setForm({...form,inactive_days:e.target.value})}/>
-      </div>
-      <Button loading={busy}>Simpan pengaturan</Button>
-     </form>
-    </div>
+    <>
+     <div className="form-row" style={{alignItems:'stretch',marginBottom:20}}>
+      {/* Panel 1: Profil & Identitas Super Admin */}
+      <form
+       className="panel"
+       onSubmit={async e=>{
+        e.preventDefault();
+        setBusy(true);
+        try{
+         await api('/auth/profile',{method:'PATCH',body:adminProfile});
+         await refresh();
+         show('Profil Super Admin berhasil diperbarui');
+        }catch(err){
+         show(err.message,'error');
+        }finally{
+         setBusy(false);
+        }
+       }}
+      >
+       <div className="between" style={{marginBottom:12}}>
+        <h3 style={{margin:0,display:'flex',alignItems:'center',gap:8}}>
+         <UserRound size={19} color="#1669e8"/> Profil Akun Super Admin
+        </h3>
+        <span className="badge status-approved">
+         <ShieldCheck size={12} style={{marginRight:3}}/> Super Admin Utama
+        </span>
+       </div>
+       <p className="muted text-xs" style={{marginBottom:16}}>
+        Perbarui nama tampilan dan nomor kontak resmi Super Admin.
+       </p>
+       <div className="form-field">
+        <label>Nama Lengkap Super Admin</label>
+        <input
+         required
+         value={adminProfile.name}
+         onChange={e=>setAdminProfile({...adminProfile,name:e.target.value})}
+         placeholder="Nama Super Admin"
+        />
+       </div>
+       <div className="form-field">
+        <label>Nomor HP / WhatsApp Admin</label>
+        <input
+         value={adminProfile.phone}
+         onChange={e=>setAdminProfile({...adminProfile,phone:e.target.value})}
+         placeholder="Contoh: 081234567890"
+        />
+       </div>
+       <Button loading={busy}>Simpan Profil Admin</Button>
+      </form>
+
+      {/* Panel 2: Pengaturan Operasional & Kebijakan Platform */}
+      <form
+       className="panel"
+       onSubmit={async e=>{
+        e.preventDefault();
+        setBusy(true);
+        try{
+         await api('/admin/settings',{
+          method:'PATCH',
+          body:{
+           inactive_days:Number(form.inactive_days??settings.find(s=>s.key==='inactive_days')?.value??30),
+           commission_per_item:Number(form.commission_per_item??settings.find(s=>s.key==='commission_per_item')?.value??2000),
+           qris_merchant_name:form.qris_merchant_name??settings.find(s=>s.key==='qris_merchant_name')?.value??'KampusBalik Official (Super Admin)',
+           support_phone:form.support_phone??settings.find(s=>s.key==='support_phone')?.value??''
+          }
+         });
+         show('Pengaturan operasional platform berhasil disimpan');
+         load();
+        }catch(err){
+         show(err.message,'error');
+        }finally{
+         setBusy(false);
+        }
+       }}
+      >
+       <h3 style={{margin:0,display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+        <Settings size={19} color="#1669e8"/> Kebijakan Operasional Platform
+       </h3>
+       <p className="muted text-xs" style={{marginBottom:16}}>
+        Atur batas hari pantauan toko tidak aktif, tarif komisi default, dan kontak bantuan platform.
+       </p>
+       <div className="form-row">
+        <div className="form-field">
+         <label>Batas Toko Tidak Aktif (1–365 Hari)</label>
+         <input
+          type="number"
+          min={1}
+          max={365}
+          required
+          value={form.inactive_days??settings.find(s=>s.key==='inactive_days')?.value??30}
+          onChange={e=>setForm({...form,inactive_days:e.target.value})}
+         />
+        </div>
+        <div className="form-field">
+         <label>Komisi Per Barang Terjual (Rp)</label>
+         <input
+          type="number"
+          min={0}
+          required
+          value={form.commission_per_item??settings.find(s=>s.key==='commission_per_item')?.value??2000}
+          onChange={e=>setForm({...form,commission_per_item:e.target.value})}
+         />
+        </div>
+       </div>
+       <div className="form-field">
+        <label>Nama Merchant QRIS Super Admin</label>
+        <input
+         value={form.qris_merchant_name??settings.find(s=>s.key==='qris_merchant_name')?.value??'KampusBalik Official (Super Admin)'}
+         onChange={e=>setForm({...form,qris_merchant_name:e.target.value})}
+         placeholder="KampusBalik Official (Super Admin)"
+        />
+       </div>
+       <div className="form-field">
+        <label>Kontak WhatsApp Pusat Bantuan KampusBalik (Opsional)</label>
+        <input
+         value={form.support_phone??settings.find(s=>s.key==='support_phone')?.value??''}
+         onChange={e=>setForm({...form,support_phone:e.target.value})}
+         placeholder="Contoh: 0812-xxxx-xxxx"
+        />
+       </div>
+       <Button loading={busy}>Simpan Pengaturan Platform</Button>
+      </form>
+     </div>
+
+     <div className="form-row" style={{alignItems:'stretch'}}>
+      {/* Panel 3: Ubah Alamat Email Super Admin */}
+      <form
+       className="panel"
+       onSubmit={async e=>{
+        e.preventDefault();
+        setBusy(true);
+        try{
+         await api('/auth/email',{method:'PATCH',body:adminEmail});
+         await refresh();
+         setAdminEmail(prev=>({...prev,oldPassword:''}));
+         show('Alamat email Super Admin berhasil diperbarui');
+        }catch(err){
+         show(err.message,'error');
+        }finally{
+         setBusy(false);
+        }
+       }}
+      >
+       <h3 style={{margin:0,display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+        <Mail size={19} color="#1669e8"/> Ubah Alamat Email Super Admin
+       </h3>
+       <p className="muted text-xs" style={{marginBottom:16}}>
+        Email aktif saat ini: <b>{user?.email}</b>. Masukkan kata sandi Anda untuk mengonfirmasi perubahan email login.
+       </p>
+       <div className="form-field">
+        <label>Alamat Email Baru</label>
+        <input
+         type="email"
+         required
+         value={adminEmail.email}
+         onChange={e=>setAdminEmail({...adminEmail,email:e.target.value})}
+         placeholder="admin@kampusbalik.id"
+        />
+       </div>
+       <div className="form-field">
+        <label>Konfirmasi Kata Sandi Saat Ini</label>
+        <input
+         type="password"
+         required
+         value={adminEmail.oldPassword}
+         onChange={e=>setAdminEmail({...adminEmail,oldPassword:e.target.value})}
+         placeholder="Masukkan kata sandi saat ini"
+        />
+       </div>
+       <Button loading={busy}>Simpan Email Baru</Button>
+      </form>
+
+      {/* Panel 4: Ubah Kata Sandi Super Admin */}
+      <form
+       className="panel"
+       onSubmit={async e=>{
+        e.preventDefault();
+        if(adminPwd.newPassword!==adminPwd.confirmPassword){
+         return show('Konfirmasi kata sandi baru tidak cocok','error');
+        }
+        setBusy(true);
+        try{
+         await api('/auth/password',{
+          method:'PATCH',
+          body:{oldPassword:adminPwd.oldPassword,newPassword:adminPwd.newPassword}
+         });
+         setAdminPwd({oldPassword:'',newPassword:'',confirmPassword:''});
+         show('Kata sandi Super Admin berhasil diperbarui');
+        }catch(err){
+         show(err.message,'error');
+        }finally{
+         setBusy(false);
+        }
+       }}
+      >
+       <h3 style={{margin:0,display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+        <KeyRound size={19} color="#1669e8"/> Ubah Kata Sandi Super Admin
+       </h3>
+       <p className="muted text-xs" style={{marginBottom:16}}>
+        Gunakan minimal 8 karakter kombinasi huruf dan angka untuk menjaga keamanan akun Super Admin.
+       </p>
+       <div className="form-field">
+        <label>Kata Sandi Lama</label>
+        <input
+         type="password"
+         required
+         value={adminPwd.oldPassword}
+         onChange={e=>setAdminPwd({...adminPwd,oldPassword:e.target.value})}
+         placeholder="Masukkan kata sandi lama"
+        />
+       </div>
+       <div className="form-row">
+        <div className="form-field">
+         <label>Kata Sandi Baru (Min. 8 Karakter)</label>
+         <input
+          type="password"
+          minLength={8}
+          required
+          value={adminPwd.newPassword}
+          onChange={e=>setAdminPwd({...adminPwd,newPassword:e.target.value})}
+          placeholder="Minimal 8 karakter"
+         />
+        </div>
+        <div className="form-field">
+         <label>Ulangi Kata Sandi Baru</label>
+         <input
+          type="password"
+          minLength={8}
+          required
+          value={adminPwd.confirmPassword}
+          onChange={e=>setAdminPwd({...adminPwd,confirmPassword:e.target.value})}
+          placeholder="Ketik ulang sandi baru"
+         />
+        </div>
+       </div>
+       <Button loading={busy}>Perbarui Kata Sandi</Button>
+      </form>
+     </div>
+    </>
    )}
 
    {inspectModal&&(
     <div className="lightbox-overlay" onClick={()=>setInspectModal(null)}>
      <div className="panel" onClick={e=>e.stopPropagation()} style={{maxWidth:740,width:'95%',maxHeight:'90vh',overflowY:'auto',position:'relative',padding:24}}>
       <div className="between" style={{marginBottom:16}}>
-       <div>
-        <h3 style={{margin:0,fontSize:18}}>
-         {inspectModal.type==='store'?`Verifikasi Identitas Penjual: ${inspectModal.item.name}`:`Verifikasi KTM Pembeli: ${inspectModal.item.name}`}
-        </h3>
-        <p className="muted text-xs" style={{marginTop:4}}>
-         Pemilik: <b>{inspectModal.item.owner_name||inspectModal.item.name}</b> · Email: {inspectModal.item.owner_email||inspectModal.item.email}
-         {(inspectModal.item.owner_nim||inspectModal.item.nim)&&` · NIM: ${inspectModal.item.owner_nim||inspectModal.item.nim}`}
-        </p>
+       <div style={{display:'flex',alignItems:'center',gap:12}}>
+        {inspectModal.type==='store'&&inspectModal.item.logo_url&&(
+         <img
+          src={imageSrc(inspectModal.item.logo_url)}
+          alt={inspectModal.item.name}
+          style={{width:48,height:48,borderRadius:12,objectFit:'cover',border:'1px solid #cbd5e1'}}
+          onError={e=>{e.currentTarget.style.display='none';}}
+         />
+        )}
+        <div>
+         <h3 style={{margin:0,fontSize:18}}>
+          {inspectModal.type==='store'?`Verifikasi Identitas Penjual: ${inspectModal.item.name}`:`Verifikasi KTM Pembeli: ${inspectModal.item.name}`}
+         </h3>
+         <p className="muted text-xs" style={{marginTop:4}}>
+          Pemilik: <b>{inspectModal.item.owner_name||inspectModal.item.name}</b> · Email: {inspectModal.item.owner_email||inspectModal.item.email}
+          {(inspectModal.item.owner_nim||inspectModal.item.nim)&&` · NIM: ${inspectModal.item.owner_nim||inspectModal.item.nim}`}
+         </p>
+        </div>
        </div>
        <button onClick={()=>setInspectModal(null)} style={{padding:6,borderRadius:8,background:'#f1f5f9'}}><X size={18}/></button>
       </div>
@@ -890,17 +1169,17 @@ export default function SuperPages({kind}){
       </div>
 
       {inspectModal.type==='store'?(
-       <div className="between" style={{borderTop:'1px solid #e2e8f0',paddingTop:16}}>
+       <div className="between" style={{borderTop:'1px solid #e2e8f0',paddingTop:16,flexWrap:'wrap',gap:10}}>
         <div className="muted text-xs">
          Terakhir aktif: <b>{dateID(inspectModal.item.last_active_at)}</b>
         </div>
-        <div className="flex gap-2">
-         {['pending','rejected','suspended'].includes(inspectModal.item.status)&&(
+        <div className="flex gap-2 flex-wrap">
+         {(['pending','rejected','suspended'].includes(inspectModal.item.status)||inspectModal.item.owner_ktm_status!=='verified')&&(
           <Button loading={busy} onClick={()=>act(inspectModal.item,inspectModal.item.status==='suspended'?'reactivate':'approve')}>
            <CheckCircle2 size={16}/> Setujui & Verifikasi Toko
           </Button>
          )}
-         {inspectModal.item.status==='pending'&&(
+         {(inspectModal.item.status==='pending'||inspectModal.item.owner_ktm_status==='pending')&&(
           <Button variant="danger" loading={busy} onClick={()=>act(inspectModal.item,'reject')}>
            <XCircle size={16}/> Tolak Verifikasi
           </Button>

@@ -6,7 +6,7 @@ import RouteGuard from '@/components/ui/RouteGuard';
 import {useAuth} from '@/context/AuthContext';
 import {useToast} from '@/components/ui/Toast';
 import {Button} from '@/components/ui/Elements';
-import {api,imageSrc,dateID} from '@/lib/api';
+import {api,imageSrc,dateID,storeStatuses} from '@/lib/api';
 
 export default function Page(){
  const {user,refresh}=useAuth(),{show}=useToast();
@@ -78,12 +78,16 @@ export default function Page(){
   }
  };
 
+ const effectiveKtmStatus=(user?.role==='admin_toko'&&user?.store?.status==='approved'&&(ktmUrl||user?.store?.ktm_url))
+  ?'verified'
+  :(user?.ktm_status||'unsubmitted');
+
  const ktmBadge={
   verified:{label:'Terverifikasi Mahasiswa',cls:'status-approved'},
   pending:{label:'Menunggu Verifikasi Super Admin',cls:'status-pending'},
   rejected:{label:'Verifikasi Ditolak',cls:'status-rejected'},
   unsubmitted:{label:'Belum Mengunggah KTM',cls:'status-cancelled'}
- }[user?.ktm_status||'unsubmitted'];
+ }[effectiveKtmStatus]||{label:'Belum Mengunggah KTM',cls:'status-cancelled'};
 
  return (
   <RouteGuard roles={['customer','admin_toko','super_admin']}>
@@ -144,7 +148,7 @@ export default function Page(){
          <div style={{background:'#f8fafc',padding:10,borderRadius:10,border:'1px solid #e2e8f0'}}>
           <small className="muted" style={{display:'block',marginBottom:6,fontWeight:700}}>Foto KTM Mahasiswa:</small>
           <a href={imageSrc(ktmUrl)} target="_blank" rel="noreferrer">
-           <img src={imageSrc(ktmUrl)} alt="KTM Mahasiswa" style={{height:110,width:175,objectFit:'cover',borderRadius:6}}/>
+           <img src={imageSrc(ktmUrl)} alt="KTM Mahasiswa" style={{height:125,width:205,objectFit:'contain',background:'#0f172a',borderRadius:6}}/>
           </a>
          </div>
         )}
@@ -152,7 +156,7 @@ export default function Page(){
          <div style={{background:'#f8fafc',padding:10,borderRadius:10,border:'1px solid #e2e8f0'}}>
           <small className="muted" style={{display:'block',marginBottom:6,fontWeight:700}}>Foto Muka Penjual:</small>
           <a href={imageSrc(faceUrl)} target="_blank" rel="noreferrer">
-           <img src={imageSrc(faceUrl)} alt="Foto Muka Penjual" style={{height:110,width:110,objectFit:'cover',borderRadius:8}}/>
+           <img src={imageSrc(faceUrl)} alt="Foto Muka Penjual" style={{height:125,width:125,objectFit:'cover',background:'#0f172a',borderRadius:8}}/>
           </a>
          </div>
         )}
@@ -232,17 +236,41 @@ export default function Page(){
     {user?.role==='admin_toko'&&(
      <div className="panel" style={{marginBottom:24,background:'#eff6ff',borderColor:'#bfdbfe'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:16}}>
-       <div>
-        <h3 style={{margin:0,color:'#1e40af',display:'flex',alignItems:'center',gap:8}}>
-         <Store size={20}/> Toko Anda: {user.store?.name||'Terdaftar'} ({user.store?.status})
-        </h3>
-        <p style={{margin:'6px 0 0',fontSize:13,color:'#1d4ed8'}}>
-         Kelola katalog produk, stok, pesanan pembeli, dan keuangan toko Anda.
-        </p>
+       <div style={{display:'flex',alignItems:'center',gap:14}}>
+        <div style={{width:56,height:56,borderRadius:12,background:'#ffffff',border:'1px solid #bfdbfe',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0}}>
+         {user.store?.logo_url?(
+          <img
+           src={imageSrc(user.store.logo_url)}
+           alt={user.store.name}
+           style={{width:'100%',height:'100%',objectFit:'cover'}}
+           onError={e=>{e.currentTarget.style.display='none';}}
+          />
+         ):(
+          <Store size={24} color="#1669e8"/>
+         )}
+        </div>
+        <div>
+         <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+          <h3 style={{margin:0,color:'#1e40af'}}>
+           Toko Anda: {user.store?.name||'Terdaftar'}
+          </h3>
+          <span className={`badge status-${user.store?.status||'pending'}`}>
+           {storeStatuses[user.store?.status]||user.store?.status}
+          </span>
+         </div>
+         <p style={{margin:'4px 0 0',fontSize:13,color:'#1d4ed8'}}>
+          Kelola katalog produk, logo toko, stok, pesanan pembeli, dan keuangan toko Anda.
+         </p>
+        </div>
        </div>
-       <Link href="/admin-toko" className="btn btn-primary">
-        Masuk Dashboard Toko
-       </Link>
+       <div className="flex gap-2 flex-wrap">
+        <Link href="/admin-toko/pengaturan" className="btn btn-outline" style={{background:'#ffffff'}}>
+         Pengaturan & Logo Toko
+        </Link>
+        <Link href="/admin-toko" className="btn btn-primary">
+         Masuk Dashboard Toko
+        </Link>
+       </div>
       </div>
      </div>
     )}

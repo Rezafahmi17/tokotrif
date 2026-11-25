@@ -50,5 +50,11 @@ r.delete('/banners/:id',wrap(async(req,res)=>{await (await import('../config/db.
 r.post('/banners/upload',upload.single('image'),wrap(async(req,res)=>ok(res,{url:await saveImage(req.file)})));
 r.get('/audit-logs',wrap(async(req,res)=>ok(res,await a.audit(req.query))));
 r.get('/settings',wrap(async(req,res)=>ok(res,await a.settings())));
-r.patch('/settings',validate(z.object({inactive_days:z.coerce.number().int().min(1).max(365)})),wrap(async(req,res)=>ok(res,await a.updateSettings(req.body))));
+r.patch('/settings',validate(z.object({
+ inactive_days:z.coerce.number().int().min(1).max(365).optional(),
+ commission_per_item:z.coerce.number().min(0).optional(),
+ qris_merchant_name:z.string().max(150).optional(),
+ support_phone:z.string().max(50).optional(),
+ platform_notice:z.string().max(500).optional()
+})),wrap(async(req,res)=>ok(res,await a.updateSettings(req.body),'Pengaturan platform disimpan')));
 export default r;

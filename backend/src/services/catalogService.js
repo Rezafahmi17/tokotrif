@@ -1,7 +1,7 @@
 import {db,one,rows} from '../config/db.js';
 import {fail,pageOptions,pagination} from '../utils/common.js';
 const visible="p.status='active' AND p.deleted_at IS NULL AND s.status='approved' AND s.deleted_at IS NULL";
-const base=`SELECT p.*,c.name category_name,c.slug category_slug,s.name store_name,s.slug store_slug,s.city,
+const base=`SELECT p.*,c.name category_name,c.slug category_slug,s.name store_name,s.slug store_slug,s.city,s.logo_url store_logo,
  (SELECT url FROM product_images i WHERE i.product_id=p.id ORDER BY i.is_primary DESC,i.sort_order,i.id LIMIT 1) image_url,
  (p.stock-p.reserved) available,
  IF(p.compare_price>p.price,ROUND((p.compare_price-p.price)*100/p.compare_price),0) discount_pct

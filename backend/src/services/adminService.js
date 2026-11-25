@@ -10,8 +10,15 @@ async function inactiveDays(){return Number((await one('SELECT `value` FROM sett
 export async function listStores(q){
  await ensureCommissionSchema();
  const p=pageOptions(q),days=await inactiveDays(),filters=['s.deleted_at IS NULL'],args=[days,days];
- if(q.status){filters.push('s.status=?');args.push(q.status);}
- if(q.q){filters.push('(s.name LIKE ? OR u.email LIKE ? OR u.name LIKE ?)');args.push(`%${q.q}%`,`%${q.q}%`,`%${q.q}%`);}
+ if(q.status){
+  if(q.status==='pending'){
+   filters.push("(s.status='pending' OR u.ktm_status='pending')");
+  }else{
+   filters.push('s.status=?');
+   args.push(q.status);
+  }
+ }
+ if(q.q){filters.push('(s.name LIKE ? OR u.email LIKE ? OR u.name LIKE ? OR u.nim LIKE ?)');args.push(`%${q.q}%`,`%${q.q}%`,`%${q.q}%`,`%${q.q}%`);}
  const where=filters.join(' AND ');
  const data=await rows(`SELECT s.*,
   COALESCE(s.ktm_url, u.ktm_url) AS ktm_url,
@@ -25,7 +32,7 @@ export async function listStores(q){
   (SELECT COUNT(*) FROM store_commissions sc WHERE sc.store_id=s.id AND sc.status IN ('unpaid','rejected')) unpaid_commissions_count,
   (SELECT COALESCE(SUM(sc.total_commission),0) FROM store_commissions sc WHERE sc.store_id=s.id AND sc.status IN ('unpaid','rejected')) unpaid_commissions_amount
   FROM stores s JOIN users u ON u.id=s.owner_user_id WHERE ${where}
-  ORDER BY FIELD(s.status,'pending','approved','rejected','suspended'),COALESCE(s.last_active_at,s.created_at) DESC LIMIT ? OFFSET ?`,[...args,p.limit,p.offset]);
+  ORDER BY FIELD(s.status,'pending','approved','rejected','suspended'),FIELD(u.ktm_status,'pending','verified','rejected','unsubmitted'),COALESCE(s.last_active_at,s.created_at) DESC LIMIT ? OFFSET ?`,[...args,p.limit,p.offset]);
  const count=await one(`SELECT COUNT(*) total FROM stores s JOIN users u ON u.id=s.owner_user_id WHERE ${where}`,args.slice(2));
  return {items:data,pagination:pagination(count.total,p)};
 }
@@ -66,17 +73,17 @@ export async function stats(){
  const orders=await one('SELECT COUNT(*) total,COALESCE(SUM(status=? AND created_at>=DATE_SUB(NOW(),INTERVAL 30 DAY)),0) completed_30d FROM orders',['completed']);
  const customer=await one('SELECT COUNT(*) count FROM users WHERE role=? AND status=?',['customer','active']);
  const pendingKtm=await one("SELECT COUNT(*) count FROM users WHERE role='customer' AND ktm_status='pending' AND deleted_at IS NULL");
- const recentStores=await rows(`SELECT s.id,s.name,s.city,s.status,
+ const recentStores=await rows(`SELECT s.id,s.name,s.city,s.status,s.logo_url,
   COALESCE(s.last_active_at, u.last_login_at, s.created_at) AS last_active_at,
   TIMESTAMPDIFF(MINUTE, COALESCE(s.last_active_at, u.last_login_at, s.created_at), NOW()) AS minutes_ago,
-  u.name owner_name,u.email owner_email
+  u.name owner_name,u.email owner_email,u.ktm_status owner_ktm_status
   FROM stores s JOIN users u ON u.id=s.owner_user_id WHERE s.deleted_at IS NULL
   ORDER BY COALESCE(s.last_active_at, u.last_login_at, s.created_at) DESC LIMIT 8`);
  return {stores:count,inactive:inactive.count,orders:orders.total,completed30d:orders.completed_30d,customers:customer.count,pendingKtmBuyers:pendingKtm?.count||0,recentStores};
 }
 
 export async function transitionStore(id,action,actor,reason,ip){
- const allowed={approve:['pending','rejected','suspended'],reject:['pending'],suspend:['approved'],reactivate:['suspended']};
+ const allowed={approve:['pending','rejected','suspended','approved'],reject:['pending','approved'],suspend:['approved'],reactivate:['suspended']};
  if(!allowed[action])fail(404,'Aksi tidak tersedia');
  if(['reject','suspend'].includes(action)&&!reason?.trim())fail(422,'Alasan wajib diisi');
  const output=await tx(async c=>{
@@ -90,14 +97,15 @@ export async function transitionStore(id,action,actor,reason,ip){
    }
   }
   const to={approve:'approved',reject:'rejected',suspend:'suspended',reactivate:'approved'}[action];
-  await c.query('UPDATE stores SET status=?,rejection_reason=?,verified_by=?,verified_at=NOW() WHERE id=?',[to,reason||null,actor,id]);
+  const u=await one('SELECT id,ktm_url,face_url FROM users WHERE id=?',[s.owner_user_id],c);
+  await c.query('UPDATE stores SET status=?,rejection_reason=?,verified_by=?,verified_at=NOW(),ktm_url=COALESCE(ktm_url,?),face_url=COALESCE(face_url,?) WHERE id=?',[to,reason||null,actor,u?.ktm_url||null,u?.face_url||null,id]);
   if(to==='approved'){
-   await c.query("UPDATE users SET ktm_status='verified',ktm_rejection_reason=NULL WHERE id=?",[s.owner_user_id]);
+   await c.query("UPDATE users SET ktm_status='verified',ktm_rejection_reason=NULL,ktm_url=COALESCE(ktm_url,?),face_url=COALESCE(face_url,?) WHERE id=?",[s.ktm_url||null,s.face_url||null,s.owner_user_id]);
   }else if(to==='rejected'){
    await c.query("UPDATE users SET ktm_status='rejected',ktm_rejection_reason=? WHERE id=?",[reason||null,s.owner_user_id]);
   }
   await writeAudit(actor,`store.${action}`,'store',id,{from:s.status,to,reason},ip,c);
-  const n=await notify(s.owner_user_id,'store_status',`Status toko: ${to}`,reason||'Status toko telah diperbarui','/admin-toko',c);
+  const n=await notify(s.owner_user_id,'store_status',to==='approved'?'Toko & KTM Penjual Terverifikasi':`Status toko: ${to}`,reason||'Toko dan dokumen verifikasi KTM Anda telah disetujui oleh Super Admin.','/admin-toko',c);
   return {status:to,notification:n};
  });emitNotification(output.notification);return {status:output.status};
 }
@@ -134,4 +142,25 @@ export async function saveBanner(body,id){const values=[body.title,body.subtitle
 export async function audit(q){const p=pageOptions(q),where=['1=1'],args=[];if(q.action){where.push('a.action LIKE ?');args.push(`%${q.action}%`);}
  const items=await rows(`SELECT a.*,u.name actor_name FROM audit_logs a LEFT JOIN users u ON u.id=a.actor_user_id WHERE ${where.join(' AND ')} ORDER BY a.created_at DESC LIMIT ? OFFSET ?`,[...args,p.limit,p.offset]);const count=await one(`SELECT COUNT(*) total FROM audit_logs a WHERE ${where.join(' AND ')}`,args);return {items,pagination:pagination(count.total,p)};}
 export async function settings(){return rows('SELECT * FROM settings ORDER BY `key`');}
-export async function updateSettings(body){if(!Number.isInteger(body.inactive_days)||body.inactive_days<1||body.inactive_days>365)fail(422,'Batas hari harus antara 1 dan 365');await db.query('INSERT INTO settings (`key`,`value`) VALUES(?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)',['inactive_days',String(body.inactive_days)]);return {inactive_days:body.inactive_days};}
+export async function updateSettings(body){
+ if(body.inactive_days!==undefined){
+  const days=Number(body.inactive_days);
+  if(!Number.isInteger(days)||days<1||days>365)fail(422,'Batas hari harus antara 1 dan 365');
+  await db.query('INSERT INTO settings (`key`,`value`) VALUES(?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)',['inactive_days',String(days)]);
+ }
+ if(body.commission_per_item!==undefined){
+  const comm=Number(body.commission_per_item);
+  if(Number.isNaN(comm)||comm<0)fail(422,'Komisi per barang tidak valid');
+  await db.query('INSERT INTO settings (`key`,`value`) VALUES(?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)',['commission_per_item',String(Math.round(comm))]);
+ }
+ if(body.qris_merchant_name!==undefined){
+  await db.query('INSERT INTO settings (`key`,`value`) VALUES(?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)',['qris_merchant_name',String(body.qris_merchant_name||'KampusBalik Official (Super Admin)')]);
+ }
+ if(body.support_phone!==undefined){
+  await db.query('INSERT INTO settings (`key`,`value`) VALUES(?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)',['support_phone',String(body.support_phone||'')]);
+ }
+ if(body.platform_notice!==undefined){
+  await db.query('INSERT INTO settings (`key`,`value`) VALUES(?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)',['platform_notice',String(body.platform_notice||'')]);
+ }
+ return settings();
+}

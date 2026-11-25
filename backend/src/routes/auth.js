@@ -40,6 +40,7 @@ r.post('/login',validate(service.loginSchema),wrap(async(req,res)=>{
 
 r.post('/logout',(req,res)=>{res.clearCookie(cookieName,{...cookieOpts,maxAge:undefined});ok(res,null,'Berhasil keluar');});
 r.get('/me',authenticate,wrap(async(req,res)=>ok(res,await service.profile(req.user.id))));
+r.patch('/profile',authenticate,validate(service.profileUpdateSchema),wrap(async(req,res)=>ok(res,await service.updateProfile(req.user.id,req.body),'Profil berhasil diperbarui')));
 r.patch('/password',authenticate,validate(service.credentialsSchema),wrap(async(req,res)=>{await service.updatePassword(req.user.id,req.body);ok(res,null,'Sandi berhasil diubah');}));
 r.patch('/email',authenticate,validate(service.emailSchema),wrap(async(req,res)=>{await service.updateEmail(req.user.id,req.body);ok(res,null,'Email berhasil diubah');}));
 r.post('/forgot-password',validate(z.object({email:z.string().email()})),wrap(async(req,res)=>{await service.forgot(req.body.email);ok(res,null,'Jika email terdaftar, instruksi reset akan dikirim');}));

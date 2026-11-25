@@ -2,7 +2,7 @@
 import {useEffect,useState} from 'react';
 import {useParams,useRouter} from 'next/navigation';
 import Link from 'next/link';
-import {ShoppingCart,MessageCircle,MapPin,Star,PackageOpen,Minus,Plus} from 'lucide-react';
+import {ShoppingCart,MessageCircle,MapPin,Star,PackageOpen,Minus,Plus,Store} from 'lucide-react';
 import {api,imageSrc,rp} from '@/lib/api';
 import {useToast} from '@/components/ui/Toast';
 import {useAuth} from '@/context/AuthContext';
@@ -160,7 +160,24 @@ export default function Page(){
       <p>Sepakati titik temu dan waktu lewat chat. Bayar kepada penjual setelah bertemu dan memeriksa barang.</p>
      </div>
      <div className="detail-seller">
-      <div><b>{p.store_name}</b><small><MapPin size={12} style={{display:'inline'}}/> {p.city}</small></div>
+      <div style={{display:'flex',alignItems:'center',gap:12}}>
+       <div style={{width:44,height:44,borderRadius:10,background:'#eff6ff',border:'1px solid #dbeafe',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0}}>
+        {p.store_logo?(
+         <img
+          src={imageSrc(p.store_logo)}
+          alt={p.store_name}
+          style={{width:'100%',height:'100%',objectFit:'cover'}}
+          onError={e=>{e.currentTarget.style.display='none';}}
+         />
+        ):(
+         <Store size={20} color="#1669e8"/>
+        )}
+       </div>
+       <div>
+        <b>{p.store_name}</b>
+        <small><MapPin size={12} style={{display:'inline'}}/> {p.city}</small>
+       </div>
+      </div>
       <Link className="text-link" href={`/toko/${p.store_slug}`}>Lihat toko</Link>
      </div>
     </div>
