@@ -110,11 +110,15 @@ export default function Page(){
  const remainingSlots=editing?Math.max(0,5-images.length):5;
 
  return <DashboardShell kind="store">
-  <h1>Produk toko</h1>
-  <p className="dashboard-subtitle">Kelola katalog dan foto produk milik toko Anda.</p>
-  <div className="admin-toolbar">
-   <input className="field" placeholder="Cari produk..." value={q} onChange={e=>setQ(e.target.value)}/>
-   <Button onClick={()=>start()}><Plus size={16}/> Tambah produk</Button>
+  <div className="between" style={{flexWrap:'wrap',gap:12,marginBottom:8}}>
+   <div>
+    <h1 style={{marginBottom:4}}>Produk Toko</h1>
+    <p className="dashboard-subtitle" style={{marginBottom:0}}>Kelola katalog, stok awal, dan foto produk milik toko Anda.</p>
+   </div>
+   <Button onClick={()=>start()}><Plus size={17}/> + Tambah Barang Baru</Button>
+  </div>
+  <div className="admin-toolbar" style={{marginTop:12}}>
+   <input className="field" placeholder="Cari nama produk..." value={q} onChange={e=>setQ(e.target.value)}/>
   </div>
   {showForm&&(
    <form className="admin-form" onSubmit={save}>

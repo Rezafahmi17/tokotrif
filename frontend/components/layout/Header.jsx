@@ -9,7 +9,7 @@ import {api} from '@/lib/api';
 
 export default function Header(){
  const {user,logout}=useAuth(),{count}=useCart(),router=useRouter(),path=usePathname();
- const [query,setQuery]=useState(''),[menu,setMenu]=useState(false),[cats,setCats]=useState([]),[notif,setNotif]=useState([]),[openNot,setOpenNot]=useState(false),[city,setCity]=useState(''),[unreadChat,setUnreadChat]=useState(0);
+ const [query,setQuery]=useState(''),[menu,setMenu]=useState(false),[cats,setCats]=useState([]),[notif,setNotif]=useState([]),[openNot,setOpenNot]=useState(false),[openProfile,setOpenProfile]=useState(false),[city,setCity]=useState(''),[unreadChat,setUnreadChat]=useState(0);
 
  useEffect(()=>{api('/catalog/categories').then(setCats).catch(()=>{});},[]);
  useEffect(()=>{
@@ -22,7 +22,7 @@ export default function Header(){
    }).catch(()=>{});
   }
  },[user?.id,path]);
- useEffect(()=>{setMenu(false);setOpenNot(false);},[path]);
+ useEffect(()=>{setMenu(false);setOpenNot(false);setOpenProfile(false);},[path]);
 
  const search=e=>{
   e.preventDefault();
@@ -106,8 +106,8 @@ export default function Header(){
       )}
 
       {user?(
-       <div className="profile-menu">
-        <button>
+       <div className={`profile-menu ${openProfile?'profile-open':''}`}>
+        <button type="button" onClick={()=>{setOpenProfile(!openProfile);setOpenNot(false);}}>
          <UserRound size={20}/>
          <span>{user.name.split(' ')[0]}</span>
          <ChevronDown size={13}/>
@@ -123,11 +123,12 @@ export default function Header(){
            </span>
           </div>
          )}
-         <Link href="/akun">Pengaturan & Verifikasi KTM</Link>
-         {['customer','admin_toko'].includes(user.role)&&<Link href="/chat"><MessageCircle size={14}/> Riwayat Chat</Link>}
-         {user.role==='admin_toko'&&<Link href="/admin-toko"><Store size={14}/> Dashboard Toko</Link>}
-         {user.role==='super_admin'&&<Link href="/super-admin">Super Admin</Link>}
-         <button onClick={logout}><LogOut size={14}/> Keluar</button>
+         <Link href="/akun" onClick={()=>setOpenProfile(false)}>Pengaturan & Verifikasi KTM</Link>
+         {['customer','admin_toko'].includes(user.role)&&<Link href="/chat" onClick={()=>setOpenProfile(false)}><MessageCircle size={14}/> Riwayat Chat</Link>}
+         {user.role==='admin_toko'&&<Link href="/admin-toko" onClick={()=>setOpenProfile(false)}><Store size={14}/> Dashboard Toko</Link>}
+         {user.role==='admin_toko'&&<Link href="/admin-toko/produk" onClick={()=>setOpenProfile(false)}><Package size={14}/> + Tambah / Kelola Produk</Link>}
+         {user.role==='super_admin'&&<Link href="/super-admin" onClick={()=>setOpenProfile(false)}>Super Admin</Link>}
+         <button type="button" onClick={()=>{setOpenProfile(false);logout();}}><LogOut size={14}/> Keluar</button>
         </div>
        </div>
       ):(
@@ -140,18 +141,20 @@ export default function Header(){
      </div>
     </div>
 
-    <div className="mobile-search-row">
-     <form className="mobile-search-form" onSubmit={search}>
-      <Search size={16} className="search-icon"/>
-      <input
-       value={query}
-       onChange={e=>setQuery(e.target.value)}
-       placeholder="Cari produk kampus..."
-       aria-label="Cari produk di KampusBalik"
-      />
-      <button type="submit">Cari</button>
-     </form>
-    </div>
+    {!isDashboardPath&&(
+     <div className="mobile-search-row">
+      <form className="mobile-search-form" onSubmit={search}>
+       <Search size={16} className="search-icon"/>
+       <input
+        value={query}
+        onChange={e=>setQuery(e.target.value)}
+        placeholder="Cari produk kampus..."
+        aria-label="Cari produk di KampusBalik"
+       />
+       <button type="submit">Cari</button>
+      </form>
+     </div>
+    )}
    </header>
 
    <nav className={`subnav ${menu?'mobile-open':''} ${isDashboardPath?'subnav-dashboard':''}`}>
@@ -171,6 +174,7 @@ export default function Header(){
          {['customer','admin_toko'].includes(user.role)&&<Link href="/chat" onClick={()=>setMenu(false)} style={{display:'flex',alignItems:'center',gap:8}}><MessageCircle size={15}/> Riwayat Chat {unreadChat>0?`(${unreadChat})`:''}</Link>}
          <Link href="/akun" onClick={()=>setMenu(false)} style={{display:'flex',alignItems:'center',gap:8}}><UserRound size={15}/> Akun & Verifikasi KTM ({user.name.split(' ')[0]})</Link>
          {user.role==='admin_toko'&&<Link href="/admin-toko" onClick={()=>setMenu(false)} style={{display:'flex',alignItems:'center',gap:8}}><Store size={15}/> Dashboard Toko</Link>}
+         {user.role==='admin_toko'&&<Link href="/admin-toko/produk" onClick={()=>setMenu(false)} style={{display:'flex',alignItems:'center',gap:8,color:'#38bdf8',fontWeight:700}}><Package size={15}/> + Tambah / Kelola Barang</Link>}
          {user.role==='super_admin'&&<Link href="/super-admin" onClick={()=>setMenu(false)} style={{display:'flex',alignItems:'center',gap:8}}><ShieldCheck size={15}/> Super Admin</Link>}
          <button className="drawer-logout-btn" onClick={logout}><LogOut size={14}/> Keluar</button>
         </>

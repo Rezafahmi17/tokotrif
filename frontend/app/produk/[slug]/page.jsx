@@ -2,7 +2,7 @@
 import {useEffect,useState} from 'react';
 import {useParams,useRouter} from 'next/navigation';
 import Link from 'next/link';
-import {ShoppingCart,MessageCircle,MapPin,Star,PackageOpen} from 'lucide-react';
+import {ShoppingCart,MessageCircle,MapPin,Star,PackageOpen,Minus,Plus} from 'lucide-react';
 import {api,imageSrc,rp} from '@/lib/api';
 import {useToast} from '@/components/ui/Toast';
 import {useAuth} from '@/context/AuthContext';
@@ -97,11 +97,63 @@ export default function Page(){
       {p.compare_price>p.price&&<span className="strikethrough">{rp(p.compare_price)}</span>}
      </div>
      <p className="muted text-sm">{p.description||'Belum ada deskripsi produk.'}</p>
-     <p style={{marginTop:16}}><b>Stok tersedia:</b> {p.available>0?p.available:'Habis'}</p>
+
+     <div className="detail-qty-box">
+      <div className="detail-qty-head">
+       <span className="detail-qty-label">Atur Jumlah Barang</span>
+       <span className="detail-stock-badge">
+        Stok tersedia: <b>{p.available>0?`${p.available} barang`:'Habis'}</b>
+       </span>
+      </div>
+      <div className="detail-qty-row">
+       <div className="qty-stepper" aria-label="Pengatur jumlah barang">
+        <button
+         type="button"
+         className="qty-btn"
+         aria-label="Kurangi jumlah barang"
+         disabled={qty<=1||p.available<=0}
+         onClick={()=>setQty(q=>Math.max(1,q-1))}
+        >
+         <Minus size={16} strokeWidth={2.5}/>
+        </button>
+        <input
+         className="qty-value"
+         type="number"
+         inputMode="numeric"
+         min={1}
+         max={Math.max(1,p.available)}
+         value={qty}
+         aria-label="Jumlah barang"
+         onChange={e=>{
+          const val=Number(e.target.value);
+          if(!val||val<1)setQty(1);
+          else setQty(Math.min(Math.max(1,p.available),val));
+         }}
+        />
+        <button
+         type="button"
+         className="qty-btn"
+         aria-label="Tambah jumlah barang"
+         disabled={p.available<=0||qty>=p.available}
+         onClick={()=>setQty(q=>Math.min(p.available,q+1))}
+        >
+         <Plus size={16} strokeWidth={2.5}/>
+        </button>
+       </div>
+       <div className="detail-subtotal">
+        <small className="muted">Subtotal</small>
+        <b>{rp(Number(p.price||0)*qty)}</b>
+       </div>
+      </div>
+     </div>
+
      <div className="detail-actions">
-      <input className="field" style={{width:76}} type="number" min={1} max={p.available} value={qty} onChange={e=>setQty(Math.max(1,Number(e.target.value)||1))}/>
-      <Button disabled={p.available<=0||qty>p.available} loading={busy} onClick={add}><ShoppingCart size={16}/> Keranjang</Button>
-      <Button variant="outline" onClick={chat}><MessageCircle size={16}/> Chat</Button>
+      <Button disabled={p.available<=0||qty>p.available} loading={busy} onClick={add}>
+       <ShoppingCart size={17}/> + Tambah ke Keranjang
+      </Button>
+      <Button variant="outline" onClick={chat}>
+       <MessageCircle size={17}/> Chat Penjual
+      </Button>
      </div>
      <div className="info-panel">
       <b>COD tunai, tanpa kurir</b>

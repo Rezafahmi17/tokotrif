@@ -54,8 +54,16 @@ export default function ProductCard({product:p}){
       <span className="ellipsis">{p.store_name}</span>
       <small><MapPin size={11}/>{p.city}</small>
      </div>
-     <button aria-label={`Tambah ${p.name} ke keranjang`} title="Tambah keranjang" onClick={add} disabled={p.available<=0}>
-      <ShoppingCart size={17}/>
+     <button
+      type="button"
+      className="product-add-btn"
+      aria-label={`Tambah ${p.name} ke keranjang`}
+      title="Tambah ke keranjang"
+      onClick={add}
+      disabled={p.available<=0}
+     >
+      <ShoppingCart size={15}/>
+      <span>+ Beli</span>
      </button>
     </div>
    </div>
